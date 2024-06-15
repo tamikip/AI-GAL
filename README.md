@@ -5,7 +5,8 @@
 1. stable diffusion
 2. gpt-sovits(可以用其他替代，但是要自己改代码)
 3. rembg（github上面有）
-4. 配置
+4. 我的资源包（右侧）
+5. 配置
 ![屏幕截图 2024-06-15 221506](https://github.com/tamikip/AI-GAL/assets/147692760/06f51f89-43a1-4367-9d8f-766c46bc1434)
 ![屏幕截图 2024-06-15 221317](https://github.com/tamikip/AI-GAL/assets/147692760/741da70e-0293-41df-ab50-6ced1753c60c)
 把圈住的地方自己替换掉
