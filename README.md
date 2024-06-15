@@ -3,8 +3,8 @@
 - chatgpt的密钥（或者本地部署LLM）
 - 安装好以下程序：
 1. stable diffusion
-2.gpt-sovits(可以用其他替代，但是要自己改代码)
-3.rembg（github上面有）
+2. gpt-sovits(可以用其他替代，但是要自己改代码)
+3. rembg（github上面有）
 
 ## 正式开始
 ### 在运行程序之前，你首先要：
