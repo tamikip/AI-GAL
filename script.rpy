@@ -46,17 +46,17 @@ label splashscreen:
     hide text with dissolve
     with Pause(1)
     return
-label start:
-    image background_image = "123.png"
-    image character_image = "123.png"
-    $ t = threading.Thread(target=main.main,daemon = True)
-    show loading movie
-    $ t.start()
-    while not if_already:
-        $ renpy.pause(1, hard=True)
-        $ from main import if_already
 
-    "资源加载完成"
+label start:
+    if os.path.getsize(rf"{game_directory}\story.txt") == 0:
+        $ t = threading.Thread(target=main.main,daemon = True)
+        show loading movie
+        $ t.start()
+        while not if_already:
+            $ renpy.pause(1, hard=True)
+            $ from main import if_already
+        scene black
+        "资源加载完成,单击开始游戏"
 
     play music "music.mp3"
     $ create_thread()
