@@ -19,9 +19,31 @@ audio_directory = os.path.join(game_directory, "audio")
 
 
 def gpt(system, prompt, mode="default"):
+    config.read('config.ini', encoding='utf-8')
+    key = config.get('CHATGPT', 'GPT_KEY')
+    url = config.get('CHATGPT', 'BASE_URL')
+    if mode == "default":
+        url = "https://one-api.bltcy.top/v1/chat/completions"
+        key = "sk-Lf7dN6r59Dv9KvHM4b353a777a6247F7Bd4729C6B0E87a28"
+        model = "gpt-4o"
+
+    elif mode == "free":
+        url = "https://one.caifree.com/v1/chat/completions"
+        key = "sk-RD8n3ajylKBA6178505eB1D34300485683E279EbBc90D2B8"
+        model = "gpt-4"
+
+    elif mode == "deepseek":
+        url = "https://api.deepseek.com/v1/chat/completions"
+        key = "sk-c05703ac68b74c3f8c6e6429bc2a82fa"
+        model = "deepseek-chat"
+
+    elif mode == "Baichuan":
+        key = 'sk-d174a0e509f628026d155fa1f2da4b96'
+        url = 'https://api.baichuan-ai.com/v1/chat/completions'
+        model = "Baichuan4"
 
     payload = json.dumps({
-        "model": "model",
+        "model": model,
         "messages": [
             {
                 "role": "system",
@@ -36,16 +58,16 @@ def gpt(system, prompt, mode="default"):
 
     headers = {
         'Accept': 'application/json',
-        'Authorization': f'Bearer your_api_key',
+        'Authorization': f'Bearer {key}',
         'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
         'Content-Type': 'application/json'
     }
 
-    response = requests.request("POST", "base_url", headers=headers, data=payload)
+    response = requests.request("POST", url, headers=headers, data=payload)
     content = json.loads(response.text)['choices'][0]['message']['content']
     return content
 
-#分离文本
+
 def fenli(text):
     title_pattern = re.compile(r"标题:(.+)")
     outline_pattern = re.compile(r"大纲:(.+?)背景:", re.DOTALL)
@@ -58,7 +80,7 @@ def fenli(text):
     information = (title, outline, background, characters)
     return information
 
-#ai绘画
+
 def generate_image(prompt, image_name, mode):
     global images_directory
     url = "http://127.0.0.1:7860"
@@ -67,11 +89,13 @@ def generate_image(prompt, image_name, mode):
         width = 960
         height = 540
         prompt2 = "(no_human)"
+        model = "tmndMix_tmndMixVPruned.safetensors [d9f11471a8]"
 
     else:
         width = 512
         height = 768
         prompt2 = "(upper_body),solo"
+        model = "天空之境.safetensors [c1d961233a]"
 
     payload = {
         "prompt": f"masterpiece,wallpaper,simple background,{prompt},{prompt2}",
@@ -109,27 +133,28 @@ def generate_image(prompt, image_name, mode):
     except:
         print("绘图失败！")
 
-#gpt-sovits，可用其他替换
+
 def generate_audio(response, name, output_name):
     global audio_directory
+    config.read('config.ini', encoding='utf-8')
 
     json_data = {
-        "gpt_model_path": "",
-        "sovits_model_path": ""
+        "gpt_model_path": config.get('SOVITS', 'gpt_model_path'),
+        "sovits_model_path": config.get('SOVITS', 'sovits_model_path')
     }
-    #角色池子，1号必须为男音，其他号为女音
     if name == 1:
-        url = f'http://127.0.0.1:9880?refer_wav_path=zc.wav&prompt_text=明明只是活着，哀伤却无处不在。&prompt_language=zh&text={response}&text_language=zh'
+        url = config.get('SOVITS', 'sovits_url1').format(response=response)
+        url = f"url"
     elif name == 2:
-        url = f'http://127.0.0.1:9880?refer_wav_path=dxl.wav&prompt_text=你好，我来自中国，我是中国人。&prompt_language=zh&text={response}&text_language=zh'
+        url = config.get('SOVITS', 'sovits_url2').format(response=response)
     elif name == 3:
-        url = f'http://127.0.0.1:9880?refer_wav_path=hnr.wav&prompt_text=你好，来自中国，我是中国人。&prompt_language=zh&text={response}&text_language=zh'
+        url = config.get('SOVITS', 'sovits_url3').format(response=response)
     elif name == 4:
-        url = f'http://127.0.0.1:9880?refer_wav_path=als.wav&prompt_text=アリス、知ってます。世の中には、メイドカフェというものがあるらしいです。&prompt_language=ja&text={response}&text_language=zh'
+        url = config.get('SOVITS', 'sovits_url4').format(response=response)
     elif name == 5:
-        url = f'http://127.0.0.1:9880?refer_wav_path=hh.wav&prompt_text=你怎么知道？&prompt_language=zh&text={response}&text_language=zh'
+        url = config.get('SOVITS', 'sovits_url5').format(response=response)
     else:
-        url = f'http://127.0.0.1:9880?refer_wav_path=234.wav&prompt_text=但凯亚哥哥说，这样做了以后，琴团长恐怕会让我再也见不到第二天的太阳。&prompt_language=zh&text={response}&text_language=zh'
+        url = config.get('SOVITS', 'sovits_url6').format(response=response)
 
     requests.post('http://127.0.0.1:9880/set_model', json=json_data)
 
@@ -167,7 +192,7 @@ def add_dialogue_to_json(character, text, background_image, audio):
     except Exception as e:
         print(f"发生错误:{e}")
 
-#角色立绘去背景
+
 def rembg(pic):
     global images_directory
     url = "http://localhost:7000/api/remove"
@@ -203,6 +228,8 @@ def main():
     booklines = book.splitlines()
     print(book)
 
+    characters = re.sub(r'[^\u4e00-\u9fa5]', '', characters)  # 标准化名字
+
     with open(rf"{game_directory}\story.txt", 'w', encoding='utf-8') as file:
         file.write(f"{book}\n")
 
@@ -222,7 +249,7 @@ def main():
         generate_image(prompt, name, "character")
         rembg(name)
         character_list.append(name)
-        with open(rf"{game_directory}\characters.txt", "a",encoding='utf-8') as file:
+        with open(rf"{game_directory}\characters.txt", "a", encoding='utf-8') as file:
             file.write(f"{name}\n")
 
     for i in booklines:
@@ -314,7 +341,7 @@ def story_continue():
             text2 = re.sub(r'\（[^)]*\）', '', text1.replace("(", "（").replace(")", "）"))  # 去除小括号
 
             try:
-                with open(rf"{game_directory}\characters.txt", 'r',encoding='utf-8') as file:
+                with open(rf"{game_directory}\characters.txt", 'r', encoding='utf-8') as file:
                     line_number = 0
                     for line in file:
                         line_number += 1
@@ -336,4 +363,4 @@ def story_continue():
 
 
 if __name__ == "__main__":
-    main()
+    generate_image_pro("a girl,sea,night,", "123", "character")
