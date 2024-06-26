@@ -6,7 +6,6 @@ import json
 import time
 import configparser
 import random
-import openai
 
 # import renpy
 
@@ -20,8 +19,13 @@ game_directory = r"D:\renpy-8.1.1-sdk.7z\AI GAL"
 game_directory = os.path.join(game_directory, "game")
 images_directory = os.path.join(game_directory, "images")
 audio_directory = os.path.join(game_directory, "audio")
+config = configparser.ConfigParser()
+config.read(rf"{game_directory}\config.ini", encoding='utf-8')
 
 
+def gpt_free(system, prompt):
+    openai.api_key = "AIzaSyC7fdeNgvqhG2-3RdjyYW__2QAituGOZLU"
+    openai.api_base = "https://llmapi.ultrasev.com/v2/gemini"
 
     response = openai.ChatCompletion.create(
         model="gemini-1.5-pro",
@@ -76,6 +80,164 @@ def separate_content(text):
     characters = characters_pattern.search(text).group(1).strip()
     information = (title, outline, background, characters)
     return information
+
+
+# ----------------------------------------------------------------------
+online_draw_key = config.get('AI绘画', '绘画key')
+url = "https://cn.tensorart.net/v1/jobs"
+headers = {
+    "Content-Type": "application/json; charset=UTF-8",
+    "Authorization": f"Bearer {online_draw_key}"
+}
+
+
+def online_generate(prompt, mode):
+    # TMND:611399039965066695
+    # 天空:611437926598989702
+    requests_id = ''.join([str(random.randint(0, 9)) for _ in range(10)])
+    if mode == 'background':
+        width = 960
+        height = 540
+        prompt2 = "(no_human)" + prompt
+        if config.get('AI绘画', '人物绘画模型ID(本地模式不填)'):
+            model = config.get('AI绘画', '人物绘画模型ID(本地模式不填)')
+        else:
+            model = "611399039965066695"
+
+    else:
+        width = 512
+        height = 768
+        prompt2 = "(upper_body),solo" + prompt
+        if config.get('AI绘画', '背景绘画模型ID(本地模式不填)'):
+            model = config.get('AI绘画', '背景绘画模型ID(本地模式不填)')
+        else:
+            model = "700862942452666384"
+    data = {
+        "request_id": str(requests_id),
+        "stages": [
+            {
+                "type": "INPUT_INITIALIZE",
+                "inputInitialize": {
+                    "seed": -1,
+                    "count": 1
+                }
+            },
+            {
+                "type": "DIFFUSION",
+                "diffusion": {
+                    "width": width,
+                    "height": height,
+                    "prompts": [{"text": prompt2}],
+                    "steps": 25,
+                    "sdVae": "animevae.pt",
+                    "sd_model": model,
+                    "clip_skip": 2,
+                    "cfg_scale": 7
+                }
+            },
+            {
+                "type": "IMAGE_TO_UPSCALER",
+                "image_to_upscaler": {
+                    "hr_upscaler": "R-ESRGAN 4x+ Anime6B",
+                    "hr_scale": 2,
+                    "hr_second_pass_steps": 10,
+                    "denoising_strength": 0.3
+                }
+            }
+        ]
+    }
+    response = requests.post(url, headers=headers, data=json.dumps(data))
+
+    # 检查响应状态码
+    if response.status_code == 200:
+        id = json.loads(response.text)['job']['id']
+        return id
+    else:
+        print(f"请求失败，状态码：{response.status_code}，请检查是否正确填写了key")
+
+
+def get_result(job_id, image_name):
+    while True:
+        time.sleep(1)
+        response = requests.get(f"{url}/{job_id}", headers=headers)
+        get_job_response_data = json.loads(response.text)
+        if 'job' in get_job_response_data:
+            job_dict = get_job_response_data['job']
+            job_status = job_dict.get('status')
+            if job_status == 'SUCCESS':
+                url2 = job_dict["successInfo"]["images"][0]["url"]
+                response = requests.get(url2)
+                with open(fr'{images_directory}\{image_name}.png', 'wb') as f:
+                    # 将图片数据写入文件
+                    f.write(response.content)
+                break
+            elif job_status == 'FAILED':
+                print(job_dict)
+                break
+
+
+def generate_image_pro(prompt, image_name, mode):
+    id = online_generate(prompt, mode)
+    get_result(id, image_name)
+
+
+def generate_audio_pro(content, speaker, output_name):
+    if speaker == 1:
+        speaker = "罗刹【中】"
+    elif speaker == 2:
+        speaker = "花火【中】"
+    elif speaker == 3:
+        speaker = "流萤【中】"
+    elif speaker == 4:
+        speaker = "藿藿【中】"
+    elif speaker == 5:
+        speaker = "三月七【中】"
+    else:
+        speaker = "符玄【中】"
+    data = {
+        "access_token": config.get('SOVITS', '语音key'),
+        "type": "tts",
+        "brand": "bert-vits2",
+        "name": "sr",
+        "prarm": {
+            "speaker": speaker,
+            "text": content,
+            "sdp_ratio": 0.2,
+            "noise_scale": 0.6,
+            "noise_scale_w": 0.9,
+            "length_scale": 1.0,
+            "language": "ZH",
+            "cut_by_sent": True,
+            "interval_between_sent": 0.2,
+            "interval_between_para": 1.0,
+            "style_text": None,
+            "style_weight": 0.7
+        }
+    }
+    headers = {
+        'Content-Type': 'application/json',
+    }
+    url = 'https://infer.acgnai.top/infer/gen'
+
+    response = requests.post(url, data=json.dumps(data), headers=headers)
+
+    if response.status_code == 200:
+        response_data = json.loads(response.text)
+        mp3_url = response_data["audio"]
+        with requests.get(mp3_url, stream=True) as r:
+            # 检查请求是否成功
+            r.raise_for_status()
+
+            # 以流的方式写入文件
+            with open(fr'{audio_directory}\{output_name}.wav', 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        print(f'音频已下载: {output_name}.wav')
+    else:
+        print('Failed:', response.status_code, response.text)
+
+
+# ----------------------------------------------------------------------
 
 
 def generate_image(prompt, image_name, mode):
@@ -204,6 +366,8 @@ def rembg(pic):
 
 def main():
     global book, game_directory, if_already, character_list
+    config = configparser.ConfigParser()
+    config.read(rf"{game_directory}\config.ini", encoding='utf-8')
 
     with open(rf'{game_directory}\dialogues.json', 'w') as file:
         file.write("""{\n"conversations": [\n]\n}""")
@@ -211,9 +375,11 @@ def main():
     with open(rf"{game_directory}\characters.txt", 'w') as file:
         file.write('')
 
+    theme = config.get('生成配置', '剧本的主题')
+
     title, outline, background, characters = separate_content(
         gpt("现在你是一名gal game剧情设计师，精通写各种各样的gal game剧情，不要使用markdown格式",
-            "现在请你写一份gal game的标题，大纲，背景，人物,你的输出格式为:标题:xx\n大纲:xx\n背景:xx\n人物:xx(每个人物占一行,人物不多于5人)，每个人物的格式是人物名:介绍,无需序号。男主角也要名字").replace(
+            f"现在请你写一份gal game的标题，大纲，背景，人物,我给出的主题是{theme}，你的输出格式为:标题:xx\n大纲:xx\n背景:xx\n人物:xx(每个人物占一行,人物不多于5人)，每个人物的格式是人物名:介绍,无需序号。男主角也要名字").replace(
             "：", ":"))
 
     book = gpt("现在你是一名galgame剧情作家，精通写各种各样的galgame剧情，请不要使用markdown格式",
@@ -224,7 +390,6 @@ def main():
 
     booklines = book.splitlines()
     print(book)
-
 
     with open(rf"{game_directory}\story.txt", 'w', encoding='utf-8') as file:
         file.write(f"{book}\n")
@@ -243,7 +408,10 @@ def main():
 
         name = characterslines[i].split(":", 1)[0]
         name = re.sub(r'[^\u4e00-\u9fa5]', '', name)  # 标准化名字
-        generate_image(prompt, name, "character")
+        if config.get('AI绘画', '云端模式'):
+            generate_image_pro(prompt, name, "character")
+        else:
+            generate_image(prompt, name, "character")
         rembg(name)
         character_list.append(name)
         with open(rf"{game_directory}\characters.txt", "a", encoding='utf-8') as file:
@@ -258,7 +426,10 @@ def main():
                     "把下面的内容翻译成英文并且变成短词,比如red,apple,big这样。请注意，地名与实际内容无关无需翻译出来，例如星之学院应该翻译成academy而不是star academy。下面是你要翻译的内容:",
                     background[0])
                 print(prompt)
-                generate_image(prompt, background[0], "background")
+                if config.get('AI绘画', '云端模式'):
+                    generate_image_pro(prompt, background[0], "background")
+                else:
+                    generate_image(prompt, background[0], "background")
                 background_image = background[0]
                 background_list.append(background_image)
 
@@ -282,7 +453,10 @@ def main():
                 audio_num = 6
 
             if character != "旁白":
-                generate_audio(text2, audio_num, text1)
+                if config.get('SOVITS', '云端模式'):
+                    generate_audio_pro(text2, audio_num, text1)
+                else:
+                    generate_audio(text2, audio_num, text1)
 
             character = "" if character == "旁白" else character
 
@@ -321,7 +495,10 @@ def story_continue():
                     "把下面的内容翻译成英文并且变成短词,比如red,apple,big这样。请注意，地名与实际内容无关无需翻译出来，例如星之学院应该翻译成academy而不是star academy。下面是你要翻译的内容:",
                     background[0])
                 print(prompt)
-                generate_image(prompt, background[0], "background")
+                if config.get('ai绘画', '云端模式'):
+                    generate_image_pro(prompt, background[0], "background")
+                else:
+                    generate_image(prompt, background[0], "background")
                 background_image = background[0]
                 background_list.append(background_image)
 
@@ -349,7 +526,10 @@ def story_continue():
                 audio_num = 6
 
             if character != "旁白" and character != "new":
-                generate_audio(text2, audio_num, text1)
+                if config.get('SOVITS', '云端模式'):
+                    generate_audio_pro(text2, audio_num, text1)
+                else:
+                    generate_audio(text2, audio_num, text1)
 
             character = "" if character == "旁白" else character
 
