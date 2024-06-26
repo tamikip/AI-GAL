@@ -22,21 +22,6 @@ audio_directory = os.path.join(game_directory, "audio")
 config = configparser.ConfigParser()
 config.read(rf"{game_directory}\config.ini", encoding='utf-8')
 
-
-def gpt_free(system, prompt):
-    openai.api_key = "AIzaSyC7fdeNgvqhG2-3RdjyYW__2QAituGOZLU"
-    openai.api_base = "https://llmapi.ultrasev.com/v2/gemini"
-
-    response = openai.ChatCompletion.create(
-        model="gemini-1.5-pro",
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": prompt}
-        ],
-    )
-    return response.choices[0].message.content
-
-
 def gpt(system, prompt, mode="default"):
     config = configparser.ConfigParser()
     config.read(rf"{game_directory}\config.ini", encoding='utf-8')
