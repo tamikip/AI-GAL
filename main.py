@@ -233,13 +233,11 @@ def generate_image(prompt, image_name, mode):
         width = 960
         height = 540
         prompt2 = "(no_human)"
-        model = "tmndMix_tmndMixVPruned.safetensors [d9f11471a8]"
 
     else:
         width = 512
         height = 768
         prompt2 = "(upper_body),solo"
-        model = "天空之境.safetensors [c1d961233a]"
 
     payload = {
         "prompt": f"masterpiece,wallpaper,simple background,{prompt},{prompt2}",
