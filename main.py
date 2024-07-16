@@ -7,26 +7,27 @@ import time
 import configparser
 import random
 
-# import renpy
+import renpy
 
 running_state = False
 background_list = []
 if_already = False
 
 character_list = []
-# game_directory = renpy.config.basedir
-game_directory = r"D:\renpy-8.1.1-sdk.7z\AI GAL"
+game_directory = renpy.config.basedir
 game_directory = os.path.join(game_directory, "game")
 images_directory = os.path.join(game_directory, "images")
 audio_directory = os.path.join(game_directory, "audio")
 config = configparser.ConfigParser()
 config.read(rf"{game_directory}\config.ini", encoding='utf-8')
 
+
 def gpt(system, prompt, mode="default"):
     config = configparser.ConfigParser()
     config.read(rf"{game_directory}\config.ini", encoding='utf-8')
     key = config.get('CHATGPT', 'GPT_KEY')
     url = config.get('CHATGPT', 'BASE_URL')
+    model = config.get('CHATGPT', 'model')
 
     payload = json.dumps({
         "model": model,
@@ -153,7 +154,6 @@ def get_result(job_id, image_name):
                 url2 = job_dict["successInfo"]["images"][0]["url"]
                 response = requests.get(url2)
                 with open(fr'{images_directory}\{image_name}.png', 'wb') as f:
-                    # 将图片数据写入文件
                     f.write(response.content)
                 break
             elif job_status == 'FAILED':
@@ -210,10 +210,7 @@ def generate_audio_pro(content, speaker, output_name):
         response_data = json.loads(response.text)
         mp3_url = response_data["audio"]
         with requests.get(mp3_url, stream=True) as r:
-            # 检查请求是否成功
             r.raise_for_status()
-
-            # 以流的方式写入文件
             with open(fr'{audio_directory}\{output_name}.wav', 'wb') as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
@@ -233,11 +230,13 @@ def generate_image(prompt, image_name, mode):
         width = 960
         height = 540
         prompt2 = "(no_human)"
+        model = "tmndMix_tmndMixVPruned.safetensors [d9f11471a8]"
 
     else:
         width = 512
         height = 768
         prompt2 = "(upper_body),solo"
+        model = "天空之境.safetensors [c1d961233a]"
 
     payload = {
         "prompt": f"masterpiece,wallpaper,simple background,{prompt},{prompt2}",
@@ -358,7 +357,7 @@ def main():
     with open(rf"{game_directory}\characters.txt", 'w') as file:
         file.write('')
 
-    theme = config.get('生成配置', '剧本的主题')
+    theme = config.get('剧情', '剧本的主题')
 
     title, outline, background, characters = separate_content(
         gpt("现在你是一名gal game剧情设计师，精通写各种各样的gal game剧情，不要使用markdown格式",
