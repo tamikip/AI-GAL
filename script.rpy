@@ -1,4 +1,4 @@
-﻿init python:
+init python:
     import json
     import os
     import threading
@@ -8,17 +8,28 @@
 
     from main import if_already
     from main import running_state
+    def list_change(a,b,c):
+        original_list = [a,b,c,"让我自己输入"]
+        choices = ['choice1', 'choice2', 'choice3','user_input']
+        transformed_list = [[item, choice] for item, choice in zip(original_list, choices)]
+        return transformed_list
 
 
-    def create_thread():
-        thread = threading.Thread(target = main.story_continue)
+    def create_thread(arg):
+        thread = threading.Thread(target=main.story_continue, args=(arg,), daemon=True)
         thread.start()
-        return thread 
+        return thread
 
     def load_dialogues(filename):
         with open(filename, 'r', encoding='utf-8') as f:
             data = json.load(f)
         return data["conversations"]
+
+    def read(filename):
+        with open(filename, 'r', encoding='utf-8') as f:
+            data = f.read()
+        return data
+
 
     def get_next_dialogue():
         global current_dialogue_index
@@ -47,6 +58,7 @@ label splashscreen:
     with Pause(1)
     return
 
+
 label start:
     if os.path.getsize(rf"{game_directory}\story.txt") == 0:
         $ t = threading.Thread(target=main.main,daemon = True)
@@ -58,23 +70,30 @@ label start:
         scene black
         "资源加载完成,单击开始游戏"
 
-    play music "music.mp3"
-    $ create_thread()
 
+    play music "music.mp3"
     while True:
         $ dialogues = load_dialogues(rf"{game_directory}\dialogues.json")
         $ dialogue = get_next_dialogue()
 
         if dialogue is None:
-            "资源加载中...请稍后..."
-            if not running_state:
-                $ create_thread()
-                $ renpy.pause(0.5, hard=True)
-                $ from main import running_state
+            $ extracted_lines = read(rf"{game_directory}\choice.txt")
+            $ extracted_lines = extracted_lines.strip().split('\n')
+            $ choice1 = extracted_lines[0]
+            $ choice2 = extracted_lines[1]
+            $ choice3 = extracted_lines[2]
+            $ choice_list=list_change(choice1,choice2,choice3)
+            $ answer = renpy.display_menu(choice_list, interact=True, screen='choice')
+            if answer == "user_input":
+                $ answer = renpy.input("请输入你接下来的选择:")
+            $ create_thread(answer)
+            "剧情生成中..."
+            $ renpy.pause(0.5, hard=True)
+            $ from main import running_state
             while running_state:
                 $ renpy.pause(1, hard=True)
                 $ from main import running_state
-                $ dialogues = load_dialogues(rf"{game_directory}\dialogues.json")
+            $ dialogues = load_dialogues(rf"{game_directory}\dialogues.json")
             $ dialogue = get_next_dialogue()
 
         $ character_name = dialogue["character"]
@@ -89,24 +108,16 @@ label start:
         else:
             $ character_image = ""
 
+        if character_name not in characters:
+            $ characters[character_name] = Character(character_name)
+        if character_name:
+            $ renpy.sound.play(audio, channel='sound')
 
-        if text == "new":
-            $ current_dialogue_index += 1
-            $ from main import running_state
-            if not running_state:
-                $ create_thread()
+        if background_image:
+            scene expression background_image
+        if character_image:
+            show expression character_image at small_center
 
-        else:
-            if character_name not in characters:
-                $ characters[character_name] = Character(character_name)
-            if character_name:
-                $ renpy.sound.play(audio, channel='sound')
-
-            if background_image:
-                scene expression background_image
-            if character_image:
-                show expression character_image at small_center
-
-            $ renpy.say(characters[character_name], text)
+        $ renpy.say(characters[character_name], text)
 
     return
