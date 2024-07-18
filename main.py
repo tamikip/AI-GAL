@@ -7,6 +7,7 @@ import time
 import configparser
 import random
 
+
 import renpy
 
 running_state = False
@@ -15,6 +16,7 @@ if_already = False
 
 character_list = []
 game_directory = renpy.config.basedir
+# game_directory = r"D:\renpy-8.1.1-sdk.7z\PROJECT"
 game_directory = os.path.join(game_directory, "game")
 images_directory = os.path.join(game_directory, "images")
 audio_directory = os.path.join(game_directory, "audio")
@@ -22,12 +24,32 @@ config = configparser.ConfigParser()
 config.read(rf"{game_directory}\config.ini", encoding='utf-8')
 
 
+
+
 def gpt(system, prompt, mode="default"):
     config = configparser.ConfigParser()
     config.read(rf"{game_directory}\config.ini", encoding='utf-8')
     key = config.get('CHATGPT', 'GPT_KEY')
     url = config.get('CHATGPT', 'BASE_URL')
-    model = config.get('CHATGPT', 'model')
+    if mode == "default":
+        url = "https://one-api.bltcy.top/v1/chat/completions"
+        key = "sk-Lf7dN6r59Dv9KvHM4b353a777a6247F7Bd4729C6B0E87a28"
+        model = "gpt-4o"
+
+    elif mode == "free":
+        url = "https://one.caifree.com/v1/chat/completions"
+        key = "sk-RD8n3ajylKBA6178505eB1D34300485683E279EbBc90D2B8"
+        model = "gpt-4"
+
+    elif mode == "deepseek":
+        url = "https://api.deepseek.com/v1/chat/completions"
+        key = "sk-c05703ac68b74c3f8c6e6429bc2a82fa"
+        model = "deepseek-chat"
+
+    elif mode == "Baichuan":
+        key = 'sk-d174a0e509f628026d155fa1f2da4b96'
+        url = 'https://api.baichuan-ai.com/v1/chat/completions'
+        model = "Baichuan4"
 
     payload = json.dumps({
         "model": model,
@@ -70,14 +92,16 @@ def separate_content(text):
 
 # ----------------------------------------------------------------------
 online_draw_key = config.get('AI绘画', '绘画key')
+
 url = "https://cn.tensorart.net/v1/jobs"
 headers = {
     "Content-Type": "application/json; charset=UTF-8",
-    "Authorization": f"Bearer {online_draw_key}"
+    "Authorization": f"Bearer 0d2977d8d84048f5a8102fdd5c7ddd1d"
 }
 
 
 def online_generate(prompt, mode):
+    print("云端启动绘画")
     # TMND:611399039965066695
     # 天空:611437926598989702
     requests_id = ''.join([str(random.randint(0, 9)) for _ in range(10)])
@@ -85,19 +109,19 @@ def online_generate(prompt, mode):
         width = 960
         height = 540
         prompt2 = "(no_human)" + prompt
-        if config.get('AI绘画', '人物绘画模型ID(本地模式不填)'):
-            model = config.get('AI绘画', '人物绘画模型ID(本地模式不填)')
-        else:
-            model = "611399039965066695"
-
+    #     if config.get('AI绘画', '人物绘画模型ID(本地模式不填)'):
+    #         model = config.get('AI绘画', '人物绘画模型ID(本地模式不填)')
+    #     else:
+    #         model = "611399039965066695"
+    #
     else:
         width = 512
         height = 768
         prompt2 = "(upper_body),solo" + prompt
-        if config.get('AI绘画', '背景绘画模型ID(本地模式不填)'):
-            model = config.get('AI绘画', '背景绘画模型ID(本地模式不填)')
-        else:
-            model = "700862942452666384"
+        # if config.get('AI绘画', '背景绘画模型ID(本地模式不填)'):
+        #     model = config.get('AI绘画', '背景绘画模型ID(本地模式不填)')
+        # else:
+        #     model = "700862942452666384"
     data = {
         "request_id": str(requests_id),
         "stages": [
@@ -116,7 +140,7 @@ def online_generate(prompt, mode):
                     "prompts": [{"text": prompt2}],
                     "steps": 25,
                     "sdVae": "animevae.pt",
-                    "sd_model": model,
+                    "sd_model": "611399039965066695",
                     "clip_skip": 2,
                     "cfg_scale": 7
                 }
@@ -154,6 +178,7 @@ def get_result(job_id, image_name):
                 url2 = job_dict["successInfo"]["images"][0]["url"]
                 response = requests.get(url2)
                 with open(fr'{images_directory}\{image_name}.png', 'wb') as f:
+                    # 将图片数据写入文件
                     f.write(response.content)
                 break
             elif job_status == 'FAILED':
@@ -210,7 +235,10 @@ def generate_audio_pro(content, speaker, output_name):
         response_data = json.loads(response.text)
         mp3_url = response_data["audio"]
         with requests.get(mp3_url, stream=True) as r:
+            # 检查请求是否成功
             r.raise_for_status()
+
+            # 以流的方式写入文件
             with open(fr'{audio_directory}\{output_name}.wav', 'wb') as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
@@ -345,6 +373,16 @@ def rembg(pic):
     with open(file_path, 'wb') as output_file:
         output_file.write(response.content)
 
+def choose_story():
+    with open(rf"{game_directory}\story.txt", 'r', encoding='utf-8') as file:
+        book = file.read()
+    choices = gpt("你是galgame剧情家，精通各种galgame写作",
+                  f"根据galgame剧情,以男主角的视角，设计男主角接下来的三个分支选项。内容:{book},返回格式:1.xxx\n2.xxx\n3.xxx,要求每个选项尽量简短。不要使用markdown语法。")
+    cleaned_text = '\n'.join([line.split('. ', 1)[1] if '. ' in line else line for line in choices.strip().split('\n')])
+    with open(rf"{game_directory}\choice.txt", 'w', encoding='utf-8') as file:
+        file.write(cleaned_text)
+    return cleaned_text
+
 
 def main():
     global book, game_directory, if_already, character_list
@@ -361,7 +399,7 @@ def main():
 
     title, outline, background, characters = separate_content(
         gpt("现在你是一名gal game剧情设计师，精通写各种各样的gal game剧情，不要使用markdown格式",
-            f"现在请你写一份gal game的标题，大纲，背景，人物,我给出的主题是{theme}，你的输出格式为:标题:xx\n大纲:xx\n背景:xx\n人物:xx(每个人物占一行,人物不多于5人)，每个人物的格式是人物名:介绍,无需序号。男主角也要名字").replace(
+            f"现在请你写一份gal game的标题，大纲，背景，人物,我给出的主题和要求是{theme}，你的输出格式为:标题:xx\n大纲:xx\n背景:xx\n人物:xx(每个人物占一行,人物不多于5人)，每个人物的格式是人物名:介绍,无需序号。男主角也要名字").replace(
             "：", ":"))
 
     book = gpt("现在你是一名galgame剧情作家，精通写各种各样的galgame剧情，请不要使用markdown格式",
@@ -390,7 +428,7 @@ def main():
 
         name = characterslines[i].split(":", 1)[0]
         name = re.sub(r'[^\u4e00-\u9fa5]', '', name)  # 标准化名字
-        if config.get('AI绘画', '云端模式'):
+        if config.getboolean('AI绘画', '云端模式'):
             generate_image_pro(prompt, name, "character")
         else:
             generate_image(prompt, name, "character")
@@ -408,7 +446,7 @@ def main():
                     "把下面的内容翻译成英文并且变成短词,比如red,apple,big这样。请注意，地名与实际内容无关无需翻译出来，例如星之学院应该翻译成academy而不是star academy。下面是你要翻译的内容:",
                     background[0])
                 print(prompt)
-                if config.get('AI绘画', '云端模式'):
+                if config.getboolean('AI绘画', '云端模式'):
                     generate_image_pro(prompt, background[0], "background")
                 else:
                     generate_image(prompt, background[0], "background")
@@ -435,7 +473,7 @@ def main():
                 audio_num = 6
 
             if character != "旁白":
-                if config.get('SOVITS', '云端模式'):
+                if config.getboolean('SOVITS', '云端模式'):
                     generate_audio_pro(text2, audio_num, text1)
                 else:
                     generate_audio(text2, audio_num, text1)
@@ -444,14 +482,15 @@ def main():
 
             if text != "":
                 add_dialogue_to_json(character, text2, background_image, text1)
-
+    choose_story()
     if_already = True
 
 
-def story_continue():
+
+
+def story_continue(choice):
     global book, running_state, game_directory, character_list
     running_state = True
-    add_dialogue_to_json("", "new", "", "")
     with open(rf"{game_directory}\story.txt", 'r', encoding='utf-8') as file:
         book = file.read()
     with open(rf"{game_directory}\character_info.txt", 'r', encoding='utf-8') as file:
@@ -459,7 +498,7 @@ def story_continue():
 
     add_book = gpt(
         "现在你是一名galgame剧情设计师，精通写各种各样的galgame剧情。只输出文本，不要输出任何多余的。不要使用markdown格式，如果需要切换场景在对话的后面加上[地点]，输出例子:旁白:xxx[地点A]\n角色A:xxx\n角色B:xxx\n角色:xxx[地点B]\n旁白:xxx，角色名字要完整。",
-        f"请你根据以下内容继续续写galgame剧情。只返回剧情。人物设定：{character_info}，内容:{book},")
+        f"请你根据以下内容继续续写galgame剧情。只返回剧情。人物设定：{character_info}，内容:{book},我选则的分支是{choice}")
 
     booklines = add_book.splitlines()
     book = book + "\n" + add_book
@@ -469,7 +508,6 @@ def story_continue():
 
     for i in booklines:
         if i.strip() != "":
-            print(i)
             background = re.findall(r'(?<=\[).*?(?=\])', i)
 
             if background and background[0] not in background_list:
@@ -477,7 +515,8 @@ def story_continue():
                     "把下面的内容翻译成英文并且变成短词,比如red,apple,big这样。请注意，地名与实际内容无关无需翻译出来，例如星之学院应该翻译成academy而不是star academy。下面是你要翻译的内容:",
                     background[0])
                 print(prompt)
-                if config.get('ai绘画', '云端模式'):
+                cloud_mode = config.getboolean('AI绘画', '云端模式')
+                if cloud_mode:
                     generate_image_pro(prompt, background[0], "background")
                 else:
                     generate_image(prompt, background[0], "background")
@@ -508,7 +547,7 @@ def story_continue():
                 audio_num = 6
 
             if character != "旁白" and character != "new":
-                if config.get('SOVITS', '云端模式'):
+                if config.getboolean('SOVITS', '云端模式'):
                     generate_audio_pro(text2, audio_num, text1)
                 else:
                     generate_audio(text2, audio_num, text1)
@@ -517,7 +556,7 @@ def story_continue():
 
             if text != "":
                 add_dialogue_to_json(character, text2, background_image, text1)
-
+    choose_story()
     running_state = False
 
 
