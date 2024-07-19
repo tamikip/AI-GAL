@@ -31,25 +31,8 @@ def gpt(system, prompt, mode="default"):
     config.read(rf"{game_directory}\config.ini", encoding='utf-8')
     key = config.get('CHATGPT', 'GPT_KEY')
     url = config.get('CHATGPT', 'BASE_URL')
-    if mode == "default":
-        url = "https://one-api.bltcy.top/v1/chat/completions"
-        key = "sk-Lf7dN6r59Dv9KvHM4b353a777a6247F7Bd4729C6B0E87a28"
-        model = "gpt-4o"
+    model = config.get('CHATGPT', 'model')
 
-    elif mode == "free":
-        url = "https://one.caifree.com/v1/chat/completions"
-        key = "sk-RD8n3ajylKBA6178505eB1D34300485683E279EbBc90D2B8"
-        model = "gpt-4"
-
-    elif mode == "deepseek":
-        url = "https://api.deepseek.com/v1/chat/completions"
-        key = "sk-c05703ac68b74c3f8c6e6429bc2a82fa"
-        model = "deepseek-chat"
-
-    elif mode == "Baichuan":
-        key = 'sk-d174a0e509f628026d155fa1f2da4b96'
-        url = 'https://api.baichuan-ai.com/v1/chat/completions'
-        model = "Baichuan4"
 
     payload = json.dumps({
         "model": model,
