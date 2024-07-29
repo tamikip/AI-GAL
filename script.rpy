@@ -3,8 +3,7 @@ init python:
     import os
     import threading
     import main
-    import threading
-    import importlib
+
 
     from main import if_already
     from main import running_state
@@ -44,8 +43,10 @@ init python:
     dialogues = []
     characters = {}
     game_directory = renpy.config.gamedir
+
 image loading movie = Movie(play="loading.webm")
 define small_center = Transform(xalign=0.5, yalign=1.0, xpos=0.5, ypos=1.0, xzoom=0.7, yzoom=0.7)
+
 
 
 
@@ -70,8 +71,8 @@ label start:
         scene black
         "资源加载完成,单击开始游戏"
 
-
-    play music "music.mp3"
+    if os.path.exists(f"{game_directory}/music/happy bgm.mp3"):
+        play music "music/happy bgm.mp3"
     while True:
         $ dialogues = load_dialogues(rf"{game_directory}\dialogues.json")
         $ dialogue = get_next_dialogue()
