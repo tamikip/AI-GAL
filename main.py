@@ -6,7 +6,7 @@ import json
 import time
 import configparser
 import random
-
+import threading
 
 import renpy
 
@@ -16,7 +16,7 @@ if_already = False
 
 character_list = []
 game_directory = renpy.config.basedir
-# game_directory = r"D:\renpy-8.1.1-sdk.7z\PROJECT"
+# game_directory = r"D:\renpy-8.1.1-sdk.7z\PROJECT"#测试用，一般不要开，要开换成自己的地址
 game_directory = os.path.join(game_directory, "game")
 images_directory = os.path.join(game_directory, "images")
 audio_directory = os.path.join(game_directory, "audio")
@@ -24,15 +24,12 @@ config = configparser.ConfigParser()
 config.read(rf"{game_directory}\config.ini", encoding='utf-8')
 
 
-
-
-def gpt(system, prompt, mode="default"):
+def gpt(system, prompt):
     config = configparser.ConfigParser()
     config.read(rf"{game_directory}\config.ini", encoding='utf-8')
     key = config.get('CHATGPT', 'GPT_KEY')
     url = config.get('CHATGPT', 'BASE_URL')
     model = config.get('CHATGPT', 'model')
-
 
     payload = json.dumps({
         "model": model,
@@ -79,7 +76,7 @@ online_draw_key = config.get('AI绘画', '绘画key')
 url = "https://cn.tensorart.net/v1/jobs"
 headers = {
     "Content-Type": "application/json; charset=UTF-8",
-    "Authorization": f"Bearer 0d2977d8d84048f5a8102fdd5c7ddd1d"
+    "Authorization": f"Bearer {online_draw_key}"
 }
 
 
@@ -92,19 +89,19 @@ def online_generate(prompt, mode):
         width = 960
         height = 540
         prompt2 = "(no_human)" + prompt
-    #     if config.get('AI绘画', '人物绘画模型ID(本地模式不填)'):
-    #         model = config.get('AI绘画', '人物绘画模型ID(本地模式不填)')
-    #     else:
-    #         model = "611399039965066695"
-    #
+        if config.get('AI绘画', '人物绘画模型ID(本地模式不填)'):
+            model = config.get('AI绘画', '人物绘画模型ID(本地模式不填)')
+        else:
+            model = "611399039965066695"
+
     else:
         width = 512
         height = 768
         prompt2 = "(upper_body),solo" + prompt
-        # if config.get('AI绘画', '背景绘画模型ID(本地模式不填)'):
-        #     model = config.get('AI绘画', '背景绘画模型ID(本地模式不填)')
-        # else:
-        #     model = "700862942452666384"
+        if config.get('AI绘画', '背景绘画模型ID(本地模式不填)'):
+            model = config.get('AI绘画', '背景绘画模型ID(本地模式不填)')
+        else:
+            model = "611437926598989702"
     data = {
         "request_id": str(requests_id),
         "stages": [
@@ -123,7 +120,7 @@ def online_generate(prompt, mode):
                     "prompts": [{"text": prompt2}],
                     "steps": 25,
                     "sdVae": "animevae.pt",
-                    "sd_model": "611399039965066695",
+                    "sd_model": model,
                     "clip_skip": 2,
                     "cfg_scale": 7
                 }
@@ -141,7 +138,6 @@ def online_generate(prompt, mode):
     }
     response = requests.post(url, headers=headers, data=json.dumps(data))
 
-    # 检查响应状态码
     if response.status_code == 200:
         id = json.loads(response.text)['job']['id']
         return id
@@ -161,7 +157,6 @@ def get_result(job_id, image_name):
                 url2 = job_dict["successInfo"]["images"][0]["url"]
                 response = requests.get(url2)
                 with open(fr'{images_directory}\{image_name}.png', 'wb') as f:
-                    # 将图片数据写入文件
                     f.write(response.content)
                 break
             elif job_status == 'FAILED':
@@ -228,6 +223,70 @@ def generate_audio_pro(content, speaker, output_name):
         print(f'音频已下载: {output_name}.wav')
     else:
         print('Failed:', response.status_code, response.text)
+
+
+def generate_music(prompt, filename):
+    def run(prompt):
+        url = config.get("音乐", "base_url")
+        url1 = f"https://{url}/suno/submit/music"
+        key = config.get("音乐", "key")
+
+        sad = "Pure music, light music, game,galgame,piano,sad"
+        common = "Pure music, light music, relaxed,cafe,game,galgame,piano"
+
+        payload = {
+            "prompt": "a",
+            "tags": sad if prompt == "sad" else common,
+            "mv": "chirp-v3-5",
+            "title": "BGM",
+            "make_instrumental": True
+        }
+
+        headers = {
+            'Authorization': f'Bearer {key}',
+            'Accept': 'application/json',
+            'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
+            'Content-Type': 'application/json'
+        }
+        response = requests.post(url1, headers=headers, json=payload)
+        id = json.loads(response.text)["data"]
+        return id
+
+    def download_music(id, filename):
+        url = config.get("音乐", "base_url")
+        url2 = f"https://{url}/suno/fetch/{id}"
+        key = config.get("音乐", "key")
+
+        payload = {}
+        headers = {
+            'Authorization': f'Bearer {key}',
+            'Accept': 'application/json',
+            'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
+            'Content-Type': 'application/json'
+        }
+        while True:
+            response = requests.request("GET", url2, headers=headers, data=payload)
+            json.loads(response.text)
+            response_data = json.loads(response.text)
+
+            if response_data['data']["status"] == 'SUCCESS':
+
+                audio_urls = [item["audio_url"] for item in response_data["data"]["data"]]
+                with requests.get(audio_urls[0], stream=True) as r:
+                    with open(fr"{game_directory}/music/{filename}.mp3", 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                print(f"文件 {filename} 已下载。")
+                with requests.get(audio_urls[0], stream=True) as r:
+                    with open(fr"{game_directory}/music/{filename}2.mp3", 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                print(f"文件 {filename}2 已下载。")
+                break
+
+    download_music(run(prompt), filename)
 
 
 # ----------------------------------------------------------------------
@@ -356,6 +415,7 @@ def rembg(pic):
     with open(file_path, 'wb') as output_file:
         output_file.write(response.content)
 
+
 def choose_story():
     with open(rf"{game_directory}\story.txt", 'r', encoding='utf-8') as file:
         book = file.read()
@@ -371,6 +431,11 @@ def main():
     global book, game_directory, if_already, character_list
     config = configparser.ConfigParser()
     config.read(rf"{game_directory}\config.ini", encoding='utf-8')
+    if config.getboolean('音乐', '音乐生成'):
+        thread1 = threading.Thread(target=generate_music, args=("common", "happy bgm"))
+        thread2 = threading.Thread(target=generate_music, args=("sad", "sad bgm"))
+        thread1.start()
+        thread2.start()
 
     with open(rf'{game_directory}\dialogues.json', 'w') as file:
         file.write("""{\n"conversations": [\n]\n}""")
@@ -386,7 +451,7 @@ def main():
             "：", ":"))
 
     book = gpt("现在你是一名galgame剧情作家，精通写各种各样的galgame剧情，请不要使用markdown格式",
-               f"现在根据以下内容开始写第一章:gal game标题:{title},gal game大纲:{outline},gal game背景:{background},galgame角色:{characters}。你的输出格式应该为对话模式，例xxx:xx表达，你的叙事节奏要非常非常慢，可以加一点新的内容进去。需要切换地点时，在句尾写[地点名]，[地点名]不可单独一行，不用切换则不写，开头第一句是旁白而且必须要包含地点[]，地点理论上不应该超过3处。不需要标题。输出例子:旁白:xxx[地点A]\n角色A:xxx\n角色B:xxx\n角色:xxx[地点B]\n旁白:xxx，角色名字要完整。")
+               f"现在根据以下内容开始写第一章:gal game标题:{title},gal game大纲:{outline},gal game背景:{background},galgame角色:{characters}。你的输出格式应该为对话模式，例xxx:xx表达，你的叙事节奏要非常非常慢，可以加一点新的内容进去。需要切换地点时，在句尾写[地点名]，[地点名]不可单独一行，不用切换则不写，开头第一句是旁白而且必须要包含地点[]，地点理论上不应该超过3处。不需要标题。输出例子:旁白:xxx[地点A]\n角色A:xxx\n角色B:xxx\n角色:xxx[地点B]\n旁白:xxx，角色名字要完整。剧情对话不要加双引号")
 
     lines = book.split('\n')  # 去掉文本最后一行
     book = '\n'.join(lines[:-1])
@@ -426,7 +491,7 @@ def main():
 
             if background and background[0] not in background_list:
                 prompt = gpt(
-                    "把下面的内容翻译成英文并且变成短词,比如red,apple,big这样。请注意，地名与实际内容无关无需翻译出来，例如星之学院应该翻译成academy而不是star academy。下面是你要翻译的内容:",
+                    "把下面的内容翻译成英文并且变成短词,比如red,apple,big这样。请注意，地名与实际内容无关无需翻译出来，例如星之学院应该翻译成academy而不是star academy。你应该只返回英文单词，下面是你要翻译的内容:",
                     background[0])
                 print(prompt)
                 if config.getboolean('AI绘画', '云端模式'):
@@ -469,8 +534,6 @@ def main():
     if_already = True
 
 
-
-
 def story_continue(choice):
     global book, running_state, game_directory, character_list
     running_state = True
@@ -495,7 +558,7 @@ def story_continue(choice):
 
             if background and background[0] not in background_list:
                 prompt = gpt(
-                    "把下面的内容翻译成英文并且变成短词,比如red,apple,big这样。请注意，地名与实际内容无关无需翻译出来，例如星之学院应该翻译成academy而不是star academy。下面是你要翻译的内容:",
+                    "把下面的内容翻译成英文并且变成短词,比如red,apple,big这样。请注意，地名与实际内容无关无需翻译出来，例如星之学院应该翻译成academy而不是star academy。你应该只返回英文单词，下面是你要翻译的内容:",
                     background[0])
                 print(prompt)
                 cloud_mode = config.getboolean('AI绘画', '云端模式')
