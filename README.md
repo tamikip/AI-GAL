@@ -30,7 +30,7 @@
 ## 正式开始
 ### 在第一次打开游戏时，你首先要：
 - 安装rembg
-- 把onnx模型放到C:\Users\username\.u2net目录下
+- 把onnx模型放到C:\Users\username\\.u2net目录下
 - 填写config.ini配置文件
 - 如果使用gpt-sovits，请把参考音频放到gpt-sovits的go-weiui.bat的同一级目录下。
 ### 在运行程序之前，你首先要（云端模式忽略1和2）：
