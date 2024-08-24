@@ -44,6 +44,17 @@
 
 ## 遇到报错
 把log.txt的报错信息复制下来，私信我
-## 这个项目是基于 GPL 许可证的项目进行二次开发的，并且遵循 GPL 许可证发布。
+## 许可证
+
+本项目基于 [Ren'Py](https://www.renpy.org/) 项目进行二次开发，并遵循以下许可证条款：
+
+- 本项目的主要部分遵循 [MIT 许可证](LICENSE)。
+- 本项目中包含的某些组件和库遵循其他许可证，包括但不限于：
+  - [GNU 宽通用公共许可证 (LGPL)](https://www.gnu.org/licenses/lgpl-3.0.html)
+  - [Zlib 许可证](https://opensource.org/licenses/Zlib)
+  - 其他相关许可证请参见各自的许可证文件。
+
+请确保在分发本项目时，包含所有相关的许可证文件。
+
 
 
