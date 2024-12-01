@@ -39,16 +39,12 @@
 项目文档：https://tamikip.github.io/AI-GAL-doc/
 ## 正式开始
 ### 在第一次打开游戏时，你首先要：
-- 安装rembg
-- 把onnx模型放到C:\Users\username/.u2net目录下
-- 填写config.ini配置文件
-- 如果使用gpt-sovits，请把参考音频放到gpt-sovits的go-weiui.bat的同一级目录下。
+- 安装rembg，stable-diffusion，gpt-sovits
+- 填写配置参数
 ### 在运行程序之前，你首先要（云端模式忽略1和2）：
 1. 运行stable diffusion的api
 2. 运行gpt-sovits的api
 3. 运行rembg的api
-## 重启剧情
-运行 重新开始新的游戏.bat
 
 ### 请从GUI.EXE中进入游戏，资源加载速度取决于您的电脑配置，请耐心等待
 
