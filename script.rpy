@@ -1,12 +1,8 @@
-init python:
+﻿init python:
     import json
     import os
     import threading
-    import main
-
-
-    from main import if_already
-    from main import running_state
+    from main import main,story_continue,generate_new_chapters_state,if_already
     def list_change(a,b,c):
         original_list = [a,b,c,"让我自己输入"]
         choices = ['choice1', 'choice2', 'choice3','user_input']
@@ -15,7 +11,7 @@ init python:
 
 
     def create_thread(arg):
-        thread = threading.Thread(target=main.story_continue, args=(arg,), daemon=True)
+        thread = threading.Thread(target=story_continue, args=(arg,), daemon=True)
         thread.start()
         return thread
 
@@ -48,8 +44,6 @@ image loading movie = Movie(play="loading.webm")
 define small_center = Transform(xalign=0.5, yalign=1.0, xpos=0.5, ypos=1.0, xzoom=0.7, yzoom=0.7)
 
 
-
-
 label splashscreen:
     scene black
     with Pause(1)
@@ -62,7 +56,7 @@ label splashscreen:
 
 label start:
     if os.path.getsize(rf"{game_directory}\story.txt") == 0:
-        $ t = threading.Thread(target=main.main,daemon = True)
+        $ t = threading.Thread(target=main,daemon = True)
         show loading movie
         $ t.start()
         while not if_already:
@@ -72,7 +66,7 @@ label start:
         "资源加载完成,单击开始游戏"
 
     if os.path.exists(f"{game_directory}/music/happy bgm.mp3"):
-        play music "music/happy bgm.mp3"
+        play music [ "music/happy bgm.mp3", "music/happy bgm2.mp3" ] fadeout 2.0 fadein 2.0
     while True:
         $ dialogues = load_dialogues(rf"{game_directory}\dialogues.json")
         $ dialogue = get_next_dialogue()
@@ -80,20 +74,18 @@ label start:
         if dialogue is None:
             $ extracted_lines = read(rf"{game_directory}\choice.txt")
             $ extracted_lines = extracted_lines.strip().split('\n')
-            $ choice1 = extracted_lines[0]
-            $ choice2 = extracted_lines[1]
-            $ choice3 = extracted_lines[2]
+            $ choice1, choice2, choice3 = extracted_lines[:3]
             $ choice_list=list_change(choice1,choice2,choice3)
             $ answer = renpy.display_menu(choice_list, interact=True, screen='choice')
             if answer == "user_input":
                 $ answer = renpy.input("请输入你接下来的选择:")
             $ create_thread(answer)
-            "剧情生成中..."
+            "剧情生成中...(请点击一下鼠标)"
             $ renpy.pause(0.5, hard=True)
-            $ from main import running_state
-            while running_state:
+            $ from main import generate_new_chapters_state
+            while generate_new_chapters_state:
                 $ renpy.pause(1, hard=True)
-                $ from main import running_state
+                $ from main import generate_new_chapters_state
             $ dialogues = load_dialogues(rf"{game_directory}\dialogues.json")
             $ dialogue = get_next_dialogue()
 
@@ -108,17 +100,14 @@ label start:
             $ character_image = f"images/{dialogue['character']}.png"
         else:
             $ character_image = ""
-
         if character_name not in characters:
             $ characters[character_name] = Character(character_name)
         if character_name:
             $ renpy.sound.play(audio, channel='sound')
 
         if background_image:
-            scene expression background_image
+            scene expression background_image with fade
         if character_image:
-            show expression character_image at small_center
-
+            show expression character_image at small_center with dissolve
         $ renpy.say(characters[character_name], text)
-
     return

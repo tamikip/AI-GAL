@@ -7,28 +7,33 @@ import time
 import configparser
 import random
 import threading
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
-import renpy
+try:
+    import renpy
 
-running_state = False
+    game_directory = renpy.config.gamedir
+except:
+    game_directory = os.getcwd()
+
+generate_new_chapters_state = False
 background_list = []
 if_already = False
+threads = []
+thread2s = []
 
 character_list = []
-game_directory = renpy.config.basedir
-# game_directory = r"D:\renpy-8.1.1-sdk.7z\PROJECT"#测试用，一般不要开，要开换成自己的地址
-game_directory = os.path.join(game_directory, "game")
+
 images_directory = os.path.join(game_directory, "images")
 audio_directory = os.path.join(game_directory, "audio")
 config = configparser.ConfigParser()
 config.read(rf"{game_directory}\config.ini", encoding='utf-8')
+sovits_type = "V2" if config.get('SOVITS', 'version') == "1" else "V1"
 
 
 def gpt(system, prompt):
-    config = configparser.ConfigParser()
-    config.read(rf"{game_directory}\config.ini", encoding='utf-8')
-    key = config.get('CHATGPT', 'GPT_KEY')
-    url = config.get('CHATGPT', 'BASE_URL')
+    gpt_key = config.get('CHATGPT', 'GPT_KEY')
+    gpt_url = config.get('CHATGPT', 'BASE_URL')
     model = config.get('CHATGPT', 'model')
 
     payload = json.dumps({
@@ -47,12 +52,12 @@ def gpt(system, prompt):
 
     headers = {
         'Accept': 'application/json',
-        'Authorization': f'Bearer {key}',
+        'Authorization': f'Bearer {gpt_key}',
         'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
         'Content-Type': 'application/json'
     }
 
-    response = requests.request("POST", url, headers=headers, data=payload)
+    response = requests.request("POST", gpt_url, headers=headers, data=payload)
     content = json.loads(response.text)['choices'][0]['message']['content']
     return content
 
@@ -71,10 +76,11 @@ def separate_content(text):
 
 
 # ----------------------------------------------------------------------
-online_draw_key = config.get('AI绘画', '绘画key')
+"""下面是关于云端部分的设置内容"""
+online_draw_key = config.get('AI绘画', 'draw_key')
 
 url = "https://cn.tensorart.net/v1/jobs"
-headers = {
+online_draw_headers = {
     "Content-Type": "application/json; charset=UTF-8",
     "Authorization": f"Bearer {online_draw_key}"
 }
@@ -82,15 +88,13 @@ headers = {
 
 def online_generate(prompt, mode):
     print("云端启动绘画")
-    # TMND:611399039965066695
-    # 天空:611437926598989702
     requests_id = ''.join([str(random.randint(0, 9)) for _ in range(10)])
     if mode == 'background':
         width = 960
         height = 540
         prompt2 = "(no_human)" + prompt
-        if config.get('AI绘画', '人物绘画模型ID(本地模式不填)'):
-            model = config.get('AI绘画', '人物绘画模型ID(本地模式不填)')
+        if config.get('AI绘画', 'character_id'):
+            model = config.get('AI绘画', 'character_id')
         else:
             model = "611399039965066695"
 
@@ -98,8 +102,8 @@ def online_generate(prompt, mode):
         width = 512
         height = 768
         prompt2 = "(upper_body),solo" + prompt
-        if config.get('AI绘画', '背景绘画模型ID(本地模式不填)'):
-            model = config.get('AI绘画', '背景绘画模型ID(本地模式不填)')
+        if config.get('AI绘画', 'background_id'):
+            model = config.get('AI绘画', 'background_id')
         else:
             model = "611437926598989702"
     data = {
@@ -122,7 +126,8 @@ def online_generate(prompt, mode):
                     "sdVae": "animevae.pt",
                     "sd_model": model,
                     "clip_skip": 2,
-                    "cfg_scale": 7
+                    "cfg_scale": 7,
+                    **({"layerDiffusion": {"enable": True, "weight": 0}} if mode != "background" else {})
                 }
             },
             {
@@ -136,19 +141,20 @@ def online_generate(prompt, mode):
             }
         ]
     }
-    response = requests.post(url, headers=headers, data=json.dumps(data))
+    response = requests.post(url, headers=online_draw_headers, data=json.dumps(data))
 
     if response.status_code == 200:
         id = json.loads(response.text)['job']['id']
         return id
     else:
         print(f"请求失败，状态码：{response.status_code}，请检查是否正确填写了key")
+        return "error"
 
 
 def get_result(job_id, image_name):
     while True:
         time.sleep(1)
-        response = requests.get(f"{url}/{job_id}", headers=headers)
+        response = requests.get(f"{url}/{job_id}", headers=online_draw_headers)
         get_job_response_data = json.loads(response.text)
         if 'job' in get_job_response_data:
             job_dict = get_job_response_data['job']
@@ -164,74 +170,79 @@ def get_result(job_id, image_name):
                 break
 
 
-def generate_image_pro(prompt, image_name, mode):
-    id = online_generate(prompt, mode)
-    get_result(id, image_name)
+def online_generate_image(prompt, image_name, mode):
+    task_id = online_generate(prompt, mode)
+    get_result(task_id, image_name)
 
 
-def generate_audio_pro(content, speaker, output_name):
+def online_generate_audio(content, speaker, output_name):
+    audio_key = config.get("SOVITS", "语音key")
     if speaker == 1:
-        speaker = "罗刹【中】"
+        speaker = "哲【绝区零】"
     elif speaker == 2:
-        speaker = "花火【中】"
+        speaker = "银狼【星穹铁道】"
     elif speaker == 3:
-        speaker = "流萤【中】"
+        speaker = "流萤【星穹铁道】"
     elif speaker == 4:
-        speaker = "藿藿【中】"
+        speaker = "宵宫【原神】"
     elif speaker == 5:
-        speaker = "三月七【中】"
+        speaker = "艾丝妲【星穹铁道】"
     else:
-        speaker = "符玄【中】"
+        speaker = "莫娜【原神】"
     data = {
-        "access_token": config.get('SOVITS', '语音key'),
+        "access_token": audio_key,
         "type": "tts",
-        "brand": "bert-vits2",
-        "name": "sr",
+        "brand": "gpt-sovits",
+        "name": "anime",
+        "method": "api",
         "prarm": {
             "speaker": speaker,
+            "emotion": "中立",
             "text": content,
-            "sdp_ratio": 0.2,
-            "noise_scale": 0.6,
-            "noise_scale_w": 0.9,
-            "length_scale": 1.0,
-            "language": "ZH",
-            "cut_by_sent": True,
-            "interval_between_sent": 0.2,
-            "interval_between_para": 1.0,
-            "style_text": None,
-            "style_weight": 0.7
+            "text_language": "中英混合",
+            "audio_url": "https://gsv.ai-lab.top",
+            "top_k": 10,
+            "top_p": 1.0,
+            "temperature": 1.0,
+            "speed": 1.0
         }
     }
     headers = {
         'Content-Type': 'application/json',
     }
-    url = 'https://infer.acgnai.top/infer/gen'
+    online_audio_url_endpoint = 'https://infer.acgnai.top/infer/gen'
 
-    response = requests.post(url, data=json.dumps(data), headers=headers)
+    response = requests.post(online_audio_url_endpoint, data=json.dumps(data), headers=headers)
+
+    print(json.loads(response.text))
 
     if response.status_code == 200:
         response_data = json.loads(response.text)
         mp3_url = response_data["audio"]
-        with requests.get(mp3_url, stream=True) as r:
-            # 检查请求是否成功
+        with requests.get(mp3_url) as r:
             r.raise_for_status()
-
-            # 以流的方式写入文件
-            with open(fr'{audio_directory}\{output_name}.wav', 'wb') as f:
+            with open(fr'{audio_directory}/{output_name}.wav', 'wb') as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
         print(f'音频已下载: {output_name}.wav')
     else:
-        print('Failed:', response.status_code, response.text)
+        return "error"
 
 
 def generate_music(prompt, filename):
-    def run(prompt):
-        url = config.get("音乐", "base_url")
-        url1 = f"https://{url}/suno/submit/music"
-        key = config.get("音乐", "key")
+    music_url = config.get("AI音乐", "base_url")
+    key = config.get("AI音乐", "api_key")
+    headers = {
+        'Authorization': f'Bearer {key}',
+        'Accept': 'application/json',
+        'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
+        'Content-Type': 'application/json'
+    }
 
-        sad = "Pure music, light music, game,galgame,piano,sad"
+    def run(prompt):
+        full_music_url = f"https://{music_url}/suno/submit/music"
+
+        sad = "Pure music, light music, game,galgame,piano,sad,violin"
         common = "Pure music, light music, relaxed,cafe,game,galgame,piano"
 
         payload = {
@@ -242,30 +253,15 @@ def generate_music(prompt, filename):
             "make_instrumental": True
         }
 
-        headers = {
-            'Authorization': f'Bearer {key}',
-            'Accept': 'application/json',
-            'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
-            'Content-Type': 'application/json'
-        }
-        response = requests.post(url1, headers=headers, json=payload)
-        id = json.loads(response.text)["data"]
-        return id
+        response = requests.post(full_music_url, headers=headers, json=payload)
+        music_id = json.loads(response.text)["data"]
+        return music_id
 
-    def download_music(id, filename):
-        url = config.get("音乐", "base_url")
-        url2 = f"https://{url}/suno/fetch/{id}"
-        key = config.get("音乐", "key")
+    def download_music(music_id, filename):
+        url2 = f"https://{music_url}/suno/fetch/{music_id}"
 
-        payload = {}
-        headers = {
-            'Authorization': f'Bearer {key}',
-            'Accept': 'application/json',
-            'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
-            'Content-Type': 'application/json'
-        }
         while True:
-            response = requests.request("GET", url2, headers=headers, data=payload)
+            response = requests.request("GET", url2, headers=headers)
             json.loads(response.text)
             response_data = json.loads(response.text)
 
@@ -278,7 +274,7 @@ def generate_music(prompt, filename):
                             if chunk:
                                 f.write(chunk)
                 print(f"文件 {filename} 已下载。")
-                with requests.get(audio_urls[0], stream=True) as r:
+                with requests.get(audio_urls[1], stream=True) as r:
                     with open(fr"{game_directory}/music/{filename}2.mp3", 'wb') as f:
                         for chunk in r.iter_content(chunk_size=8192):
                             if chunk:
@@ -300,18 +296,20 @@ def generate_image(prompt, image_name, mode):
         width = 960
         height = 540
         prompt2 = "(no_human)"
-        model = "tmndMix_tmndMixVPruned.safetensors [d9f11471a8]"
+        model = "x"
 
     else:
         width = 512
         height = 768
         prompt2 = "(upper_body),solo"
-        model = "天空之境.safetensors [c1d961233a]"
+        model = "x"
 
     payload = {
-        "prompt": f"masterpiece,wallpaper,simple background,{prompt},{prompt2}",
-        "negative_prompt": "Easynagative,bad,worse,nsfw",
-        "steps": 30,
+        "prompt": f"masterpiece,wallpaper,8k,{prompt},{prompt2}",
+        "negative_prompt": "EasyNagative,lowres, bad anatomy, text,cropped,low quality,(mutation, poorly drawn :1.2),"
+                           "normal quality, obesity,bad proportions,unnatural body,bad shadow, uncoordinated body, "
+                           "worst quality,censored,low quality,signature,watermark, username, blurry,nsfw",
+        "steps": 25,
         "sampler_name": "DPM++ 2M SDE",
         "width": width,
         "height": height,
@@ -337,45 +335,78 @@ def generate_image(prompt, image_name, mode):
                 with open(fr'{images_directory}\{final_image_name}', 'wb') as f:
                     f.write(image_data)
                 print(f'图片已保存为 {final_image_name}')
-
+            return "ok"
         else:
             print("Failed to generate image:", response.text)
+            return "error"
 
     except:
         print("绘图失败！")
+        return "error"
 
 
-def generate_audio(response, name, output_name):
+def generate_audio(type, response, name_id, output_name):
+    """    type：sovits模型版本"""
+
     global audio_directory
-    config = configparser.ConfigParser()
-    config.read(rf"{game_directory}\config.ini", encoding='utf-8')
-
+    model_name = config.get('SOVITS', f'model{name_id}')
     json_data = {
-        "gpt_model_path": config.get('SOVITS', 'gpt_model_path'),
-        "sovits_model_path": config.get('SOVITS', 'sovits_model_path')
+        "gpt_model_path": f'GPT_weights\\{model_name}.ckpt',
+        "sovits_model_path": f'SoVITS_weights\\{model_name}.pth'
     }
-    if name == 1:
-        url = config.get('SOVITS', 'sovits_url1').format(response=response)
-    elif name == 2:
-        url = config.get('SOVITS', 'sovits_url2').format(response=response)
-    elif name == 3:
-        url = config.get('SOVITS', 'sovits_url3').format(response=response)
-    elif name == 4:
-        url = config.get('SOVITS', 'sovits_url4').format(response=response)
-    elif name == 5:
-        url = config.get('SOVITS', 'sovits_url5').format(response=response)
-    else:
-        url = config.get('SOVITS', 'sovits_url6').format(response=response)
 
-    requests.post('http://127.0.0.1:9880/set_model', json=json_data)
+    full_url = config.get('SOVITS', f'sovits_url{name_id}' if 1 <= name_id <= 5 else 'sovits_url6')
+    full_url = full_url.replace("response", response)
+
+    def convert_url(original_url):
+        """把v1格式的url转换成v2格式"""
+        parsed_url = urlparse(original_url)
+        query_params = parse_qs(parsed_url.query)
+
+        new_query_params = {
+            'text': query_params.get('text', [''])[0],
+            'text_lang': query_params.get('text_language', [''])[0],
+            'ref_audio_path': query_params.get('refer_wav_path', [''])[0],
+            'prompt_lang': query_params.get('prompt_language', [''])[0],
+            'prompt_text': query_params.get('prompt_text', [''])[0],
+            'text_split_method': 'cut5',
+            'batch_size': '1',
+            'media_type': 'wav',
+            'streaming_mode': 'false'
+        }
+
+        new_query_string = urlencode(new_query_params, doseq=True)
+
+        new_url = urlunparse((
+            parsed_url.scheme,
+            parsed_url.netloc,
+            '/tts',
+            parsed_url.params,
+            new_query_string,
+            parsed_url.fragment
+        ))
+
+        return new_url
+
+    if type == "V2":
+        full_url.replace("/", "//")
+        full_url = convert_url(full_url)
+        requests.get(
+            f"http://127.0.0.1:9880/set_gpt_weights?weights_path=GPT_weights_v2/{model_name}.ckpt")
+        requests.get(
+            f"http://127.0.0.1:9880/set_sovits_weights?weights_path=SoVITS_weights_v2/{model_name}.pth")
+    else:
+        requests.post('http://127.0.0.1:9880/set_model', json=json_data)
 
     try:
-        response = requests.get(url)
+        response = requests.get(full_url)
         with open(rf'{audio_directory}\{output_name}.wav', 'wb') as file:
             file.write(response.content)
+        return "ok"
 
     except Exception as e:
         print("语音错误", e)
+        return "error"
 
 
 def add_dialogue_to_json(character, text, background_image, audio):
@@ -397,41 +428,51 @@ def add_dialogue_to_json(character, text, background_image, audio):
 
         print("新的对话已成功添加到dialogues.json文件中")
 
-    except FileNotFoundError:
-        print("错误:找不到文件 dialogues.json")
-
     except Exception as e:
         print(f"发生错误:{e}")
 
 
 def rembg(pic):
     global images_directory
-    url = "http://localhost:7000/api/remove"
+    rembg_url = "http://localhost:7000/api/remove"
     file_path = rf"{images_directory}/{pic}.png"
 
     with open(file_path, 'rb') as file:
-        response = requests.post(url, files={'file': file})
+        response = requests.post(rembg_url, files={'file': file})
 
     with open(file_path, 'wb') as output_file:
         output_file.write(response.content)
 
 
-def choose_story():
+def select_branch():
     with open(rf"{game_directory}\story.txt", 'r', encoding='utf-8') as file:
-        book = file.read()
+        story_content = file.read()
     choices = gpt("你是galgame剧情家，精通各种galgame写作",
-                  f"根据galgame剧情,以男主角的视角，设计男主角接下来的三个分支选项。内容:{book},返回格式:1.xxx\n2.xxx\n3.xxx,要求每个选项尽量简短。不要使用markdown语法。")
+                  f"根据galgame剧情,以男主角的视角，设计男主角接下来的三个分支选项。内容:{story_content},返回格式:1.xxx\n2.xxx\n3.xxx,要求每个选项尽量简短。不要使用markdown语法。")
     cleaned_text = '\n'.join([line.split('. ', 1)[1] if '. ' in line else line for line in choices.strip().split('\n')])
     with open(rf"{game_directory}\choice.txt", 'w', encoding='utf-8') as file:
         file.write(cleaned_text)
     return cleaned_text
 
 
+def start_online_draw_threads(prompt, image_name, mode):
+    global threads
+    thread = threading.Thread(target=online_generate_image, args=(prompt, image_name, mode))
+    thread.start()
+    threads.append(thread)
+
+
+def start_online_audio_threads(content, speaker, output_name):
+    global thread2s
+    thread = threading.Thread(target=online_generate_audio, args=(content, speaker, output_name))
+    thread.start()
+    threads.append(thread)
+
+
 def main():
-    global book, game_directory, if_already, character_list
-    config = configparser.ConfigParser()
-    config.read(rf"{game_directory}\config.ini", encoding='utf-8')
-    if config.getboolean('音乐', '音乐生成'):
+    global story_content, game_directory, if_already, character_list, sovits_type
+    namelist = []
+    if config.getboolean('AI音乐', 'if_on'):
         thread1 = threading.Thread(target=generate_music, args=("common", "happy bgm"))
         thread2 = threading.Thread(target=generate_music, args=("sad", "sad bgm"))
         thread1.start()
@@ -443,59 +484,72 @@ def main():
     with open(rf"{game_directory}\characters.txt", 'w') as file:
         file.write('')
 
-    theme = config.get('剧情', '剧本的主题')
+    theme = config.get('剧情', '剧本的主题', fallback='随机主题，自行发挥想象')
+    try:
+        theme = config.get('剧情', "outline")
+    except:
+        pass
 
     title, outline, background, characters = separate_content(
-        gpt("现在你是一名gal game剧情设计师，精通写各种各样的gal game剧情，不要使用markdown格式",
-            f"现在请你写一份gal game的标题，大纲，背景，人物,我给出的主题和要求是{theme}，你的输出格式为:标题:xx\n大纲:xx\n背景:xx\n人物:xx(每个人物占一行,人物不多于5人)，每个人物的格式是人物名:介绍,无需序号。男主角也要名字").replace(
+        gpt("现在你是一名galgame剧情设计师，精通写各种各样的galgame剧情，不要使用markdown格式",
+            f"现在请你写一份gal game的标题，大纲，背景，人物,我给出的主题和要求是{theme}，你的输出格式为:标题:xx\n大纲:xx\n背景:xx\n人物:xx"
+            f"(每个人物占一行,人物不多于5人)，每个人物的格式是人物名:介绍,无需序号。男主角也要名字").replace(
             "：", ":"))
 
-    book = gpt("现在你是一名galgame剧情作家，精通写各种各样的galgame剧情，请不要使用markdown格式",
-               f"现在根据以下内容开始写第一章:gal game标题:{title},gal game大纲:{outline},gal game背景:{background},galgame角色:{characters}。你的输出格式应该为对话模式，例xxx:xx表达，你的叙事节奏要非常非常慢，可以加一点新的内容进去。需要切换地点时，在句尾写[地点名]，[地点名]不可单独一行，不用切换则不写，开头第一句是旁白而且必须要包含地点[]，地点理论上不应该超过3处。不需要标题。输出例子:旁白:xxx[地点A]\n角色A:xxx\n角色B:xxx\n角色:xxx[地点B]\n旁白:xxx，角色名字要完整。剧情对话不要加双引号")
+    story_content = gpt("现在你是一名galgame剧情作家，精通写各种各样的galgame剧情，请不要使用markdown格式",
+                        f"现在根据以下内容开始写第一章:gal game标题:{title},gal game大纲:{outline},gal game背景:{background},galgame角色:{characters}。"
+                        f"你的输出格式应该为对话模式，例xxx:xx表达，你的叙事节奏要非常非常慢，可以加一点新的内容进去。需要切换地点时，在句尾写[地点名]，[地点名]不可单独一行，不用切换则不写，"
+                        f"开头第一句是旁白而且必须要包含地点[]，地点理论上不应该超过3处。不需要标题。"
+                        f"输出例子:旁白:xxx[地点A]\n角色A:xxx\n角色B:xxx\n角色:xxx[地点B]\n旁白:xxx，角色名字要完整。不要出现小括号")
 
-    lines = book.split('\n')  # 去掉文本最后一行
-    book = '\n'.join(lines[:-1])
+    lines = story_content.split('\n')  # 去掉文本最后一行,因为ai会经常总结内容
+    story_content = '\n'.join(lines[:-1])
 
-    booklines = book.splitlines()
-    print(book)
+    book_lines = story_content.splitlines()
+    print(story_content)
 
     with open(rf"{game_directory}\story.txt", 'w', encoding='utf-8') as file:
-        file.write(f"{book}\n")
+        file.write(f"{story_content}\n")
 
     with open(rf"{game_directory}\character_info.txt", 'w', encoding='utf-8') as file:
         file.write(characters)
 
-    characterslines = characters.splitlines()
-    characterslines = [item for item in characterslines if ":" in item]
-    print(characterslines)
+    characters_lines = characters.splitlines()
+    characters_lines = [item for item in characters_lines if ":" in item]
+    print(characters_lines)
 
-    for i in range(len(characterslines)):
+    for i in range(len(characters_lines)):
         prompt = gpt(
-            "根据人物设定给出相应的人物形象，应该由简短的英文单词或短句组成，输出格式样例:a girl,pink hair,black shoes,long hair,young,lovely。请注意，人名与实际内容无关无需翻译出来，只输出英文单词，不要输出多余的内容",
-            f"人物形象{characterslines[i]}")
+            "根据人物设定给出相应的人物形象，应该由简短的英文单词或短句组成，一定要加上角色的性别，男生帅，女生美。输出格式样例:"
+            "a girl,pink hair,black shoes,long hair,young,lovely。请注意，人名与实际内容无关无需翻译出来，只输出英文单词，不要输出多余的内容",
+            f"人物形象{characters_lines[i]}")
 
-        name = characterslines[i].split(":", 1)[0]
+        name = characters_lines[i].split(":", 1)[0]
         name = re.sub(r'[^\u4e00-\u9fa5]', '', name)  # 标准化名字
-        if config.getboolean('AI绘画', '云端模式'):
-            generate_image_pro(prompt, name, "character")
+        namelist.append(name)
+        if config.getboolean('AI绘画', 'if_cloud'):
+            start_online_draw_threads(prompt, name, "character")
         else:
             generate_image(prompt, name, "character")
-        rembg(name)
+            rembg(name)
         character_list.append(name)
         with open(rf"{game_directory}\characters.txt", "a", encoding='utf-8') as file:
             file.write(f"{name}\n")
+    for thread in threads:
+        thread.join()
 
-    for i in booklines:
+    for i in book_lines:
         if i.strip() != "":
             background = re.findall(r'(?<=\[).*?(?=\])', i)
 
             if background and background[0] not in background_list:
                 prompt = gpt(
-                    "把下面的内容翻译成英文并且变成短词,比如red,apple,big这样。请注意，地名与实际内容无关无需翻译出来，例如星之学院应该翻译成academy而不是star academy。你应该只返回英文单词，下面是你要翻译的内容:",
+                    "把下面的内容翻译成英文并且变成短词,比如red,apple,big这样。请注意，地名与实际内容无关无需翻译出来，"
+                    "例如星之学院应该翻译成academy而不是star academy。你应该只返回英文单词，下面是你要翻译的内容:",
                     background[0])
                 print(prompt)
-                if config.getboolean('AI绘画', '云端模式'):
-                    generate_image_pro(prompt, background[0], "background")
+                if config.getboolean('AI绘画', 'if_cloud'):
+                    online_generate_image(prompt, background[0], "background")
                 else:
                     generate_image(prompt, background[0], "background")
                 background_image = background[0]
@@ -508,62 +562,65 @@ def main():
 
             i = "旁白:" + i if ":" not in i else i
 
-            character, text = i.split(":", 1)
-            text1 = re.sub(r'\[.*?\]', '', text)
-            text2 = re.sub(r'\（[^)]*\）', '', text1.replace("(", "（").replace(")", "）"))
+            character, original_text = i.split(":", 1)
+            de_place_text = re.sub(r'\[.*?\]', '', original_text)
+            de_discribe_text = re.sub(r'\（[^)]*\）', '', de_place_text.replace("(", "（").replace(")", "）"))
 
             try:
-                index = character_list.index(character)
-                audio_num = index + 1
+                audio_index = character_list.index(character) + 1
 
             except ValueError:
                 print(f"{character} 不在列表中")
-                audio_num = 6
+                audio_index = 6
 
             if character != "旁白":
-                if config.getboolean('SOVITS', '云端模式'):
-                    generate_audio_pro(text2, audio_num, text1)
+                if config.getboolean('SOVITS', 'if_cloud'):
+                    start_online_audio_threads(de_discribe_text, audio_index, de_place_text)
                 else:
-                    generate_audio(text2, audio_num, text1)
+                    generate_audio(sovits_type, de_discribe_text, audio_index, de_place_text, )
 
             character = "" if character == "旁白" else character
 
-            if text != "":
-                add_dialogue_to_json(character, text2, background_image, text1)
-    choose_story()
+            if original_text != "":
+                add_dialogue_to_json(character, de_discribe_text, background_image, de_place_text)
+    for thread in thread2s:
+        thread.join()
+    select_branch()
     if_already = True
 
 
 def story_continue(choice):
-    global book, running_state, game_directory, character_list
-    running_state = True
+    global story_content, generate_new_chapters_state, game_directory, character_list, sovits_type
+    generate_new_chapters_state = True
     with open(rf"{game_directory}\story.txt", 'r', encoding='utf-8') as file:
-        book = file.read()
+        story_content = file.read()
     with open(rf"{game_directory}\character_info.txt", 'r', encoding='utf-8') as file:
         character_info = file.read()
 
     add_book = gpt(
-        "现在你是一名galgame剧情设计师，精通写各种各样的galgame剧情。只输出文本，不要输出任何多余的。不要使用markdown格式，如果需要切换场景在对话的后面加上[地点]，输出例子:旁白:xxx[地点A]\n角色A:xxx\n角色B:xxx\n角色:xxx[地点B]\n旁白:xxx，角色名字要完整。",
-        f"请你根据以下内容继续续写galgame剧情。只返回剧情。人物设定：{character_info}，内容:{book},我选则的分支是{choice}")
+        "现在你是一名galgame剧情设计师，精通写各种各样的galgame剧情。只输出文本，不要输出任何多余的。不要使用markdown格式，如果需要切换场景在对话的后面加上[地点]，"
+        "输出例子:旁白:xxx[地点A]\n角色A:xxx\n角色B:xxx\n角色:xxx[地点B]\n旁白:xxx，角色名字要完整。",
+        f"请你根据以下内容继续续写galgame剧情。只返回剧情。人物设定：{character_info}，内容:{story_content},我选则的分支是{choice}")
 
-    booklines = add_book.splitlines()
-    book = book + "\n" + add_book
+    book_lines = add_book.splitlines()
+    story_content = story_content + "\n" + add_book
 
     with open(rf'{game_directory}\story.txt', 'w', encoding='utf-8') as file:
-        file.write(f"{book}\n")
+        file.write(f"{story_content}\n")
 
-    for i in booklines:
+    for i in book_lines:
         if i.strip() != "":
             background = re.findall(r'(?<=\[).*?(?=\])', i)
 
             if background and background[0] not in background_list:
                 prompt = gpt(
-                    "把下面的内容翻译成英文并且变成短词,比如red,apple,big这样。请注意，地名与实际内容无关无需翻译出来，例如星之学院应该翻译成academy而不是star academy。你应该只返回英文单词，下面是你要翻译的内容:",
+                    "把下面的内容翻译成英文并且变成短词,比如red,apple,big这样。请注意，地名与实际内容无关无需翻译出来，"
+                    "例如星之学院应该翻译成academy而不是star academy。你应该只返回英文单词，下面是你要翻译的内容:",
                     background[0])
                 print(prompt)
-                cloud_mode = config.getboolean('AI绘画', '云端模式')
+                cloud_mode = config.getboolean('AI绘画', 'if_cloud')
                 if cloud_mode:
-                    generate_image_pro(prompt, background[0], "background")
+                    online_generate_image(prompt, background[0], "background")
                 else:
                     generate_image(prompt, background[0], "background")
                 background_image = background[0]
@@ -576,10 +633,10 @@ def story_continue(choice):
 
             i = "旁白:" + i if ":" not in i else i
 
-            character, text = i.split(":", 1)
-            text1 = re.sub(r'\[.*?\]', '', text)  # 去除地点
+            character, original_text = i.split(":", 1)
+            de_place_text = re.sub(r'\[.*?\]', '', original_text)  # 去除地点
 
-            text2 = re.sub(r'\（[^)]*\）', '', text1.replace("(", "（").replace(")", "）"))  # 去除小括号
+            de_discribe_text = re.sub(r'\（[^)]*\）', '', de_place_text.replace("(", "（").replace(")", "）"))  # 去除小括号
 
             try:
                 with open(rf"{game_directory}\characters.txt", 'r', encoding='utf-8') as file:
@@ -587,24 +644,25 @@ def story_continue(choice):
                     for line in file:
                         line_number += 1
                         if character in line:
-                            audio_num = line_number
+                            audio_index = line_number
             except ValueError:
                 print(f"{character} 不在列表中")
-                audio_num = 6
+                audio_index = 6
 
             if character != "旁白" and character != "new":
-                if config.getboolean('SOVITS', '云端模式'):
-                    generate_audio_pro(text2, audio_num, text1)
+                if config.getboolean('SOVITS', 'if_cloud'):
+                    online_generate_audio(de_discribe_text, audio_index, de_place_text)
                 else:
-                    generate_audio(text2, audio_num, text1)
+                    generate_audio(sovits_type, de_discribe_text, audio_index, de_place_text)
 
             character = "" if character == "旁白" else character
 
-            if text != "":
-                add_dialogue_to_json(character, text2, background_image, text1)
-    choose_story()
-    running_state = False
+            if original_text != "":
+                add_dialogue_to_json(character, de_discribe_text, background_image, de_place_text)
+    select_branch()
+    generate_new_chapters_state = False
 
 
 if __name__ == "__main__":
     main()
+
