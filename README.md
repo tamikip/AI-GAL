@@ -14,7 +14,6 @@
 5. gpt-sovits支持V2版本
 6. 修复了一些bug
 
-
 # 2024-7-29 V1.3更新日志
 1. 新增加了更新器，用户可以直接在软件里更新版本
 2. 新增加了发行版功能，用户可以导出现成的游戏剧本，导出后无法再有后续新剧情。
@@ -45,6 +44,7 @@
 
 
 项目文档：https://tamikip.github.io/AI-GAL-doc/
+qq群:982330586
 # AI-GAL有什么用？
 https://github.com/user-attachments/assets/2ef16f6e-4650-4bca-995f-d662b39b4542
 
@@ -80,7 +80,7 @@ https://github.com/user-attachments/assets/2ef16f6e-4650-4bca-995f-d662b39b4542
 2. 运行gpt-sovits的api
 3. 运行rembg的api
 
-### 请从GUI.EXE中进入游戏，资源加载速度取决于您的电脑配置，请耐心等待
+### 请从Launcher中进入游戏，资源加载速度取决于您的电脑配置，请耐心等待
 
 ## 遇到报错
 把log.txt的报错信息复制下来，私信我
