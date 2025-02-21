@@ -35,7 +35,7 @@
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=tamikip/AI-GAL&type=Date)](https://star-history.com/#tamikip/AI-GAL&Date
+[![Star History Chart](https://api.star-history.com/svg?repos=tamikip/AI-GAL&type=Date)](https://star-history.com/#tamikip/AI-GAL&Date)
 
 
 # 在开始使用之前
