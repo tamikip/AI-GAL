@@ -1,13 +1,25 @@
 ﻿init python:
     import json
     import os
+    import string
     import threading
     from main import main,story_continue,generate_new_chapters_state,if_already
-    def list_change(a,b,c):
-        original_list = [a,b,c,"让我自己输入"]
-        choices = ['choice1', 'choice2', 'choice3','user_input']
+    from GPT import gpt
+    import configparser
+    from local_vocal_generator import generate_audio
+
+    def list_change(*args, mode="story"):
+        original_list = list(args)
+        choices = [f'choice{i+1}' for i in range(len(args))]
+
+        if mode == "story":
+            original_list.append("让我自己输入")
+            choices.append('user_input')
+
         transformed_list = [[item, choice] for item, choice in zip(original_list, choices)]
         return transformed_list
+
+
 
 
     def create_thread(arg):
@@ -35,12 +47,22 @@
         else:
             return None
 
+    def get_gpt_response(system,ask, history, result_container,id):
+        global ok
+        ok = False
+        result = gpt(f"现在你要扮演以下角色:{system},你的语气应当生动，有自己的情绪，尽量让对话流畅自然。你的话语会让人觉得可爱和有趣，并逐渐展露出温暖一面,语言简短精炼，不要用()", ask, mode="context", history=history)
+        generate_audio("V2",result,id,"response")
+        result_container.append(result)
+        ok = True
+
     current_dialogue_index = 0
     dialogues = []
     characters = {}
     game_directory = renpy.config.gamedir
 
 image loading movie = Movie(play="loading.webm")
+image bedroom = "talk/bedroom.jpg"
+image sea = "talk/海.jpg"
 define small_center = Transform(xalign=0.5, yalign=1.0, xpos=0.5, ypos=1.0, xzoom=0.7, yzoom=0.7)
 
 
@@ -51,6 +73,46 @@ label splashscreen:
     with Pause(2)
     hide text with dissolve
     with Pause(1)
+    return
+
+label talk_mode:
+    scene sea
+    python:
+        extracted_lines = read(rf"{game_directory}\characters.txt")
+        extracted_lines = extracted_lines.strip().split('\n')
+        choice1, choice2, choice3, choice4 = extracted_lines[1:5]
+        choice_list = list_change(choice1, choice2, choice3, choice4,mode="talk")
+        character_choice = renpy.display_menu(choice_list, interact=True, screen='choice')
+        character_choices = {
+            "choice1": choice1,
+            "choice2": choice2,
+            "choice3": choice3,
+            "choice4": choice4
+        }
+        character = character_choices.get(character_choice)
+        id = int(''.join(filter(str.isdigit, character_choice))) + 1
+        history = []
+    while True:
+        scene bedroom
+        $ renpy.show(character,at_list=[small_center])
+        $ ask = renpy.input("请输入你的对话:")
+        $ response_container = []
+        $info = read(rf"{game_directory}\character_info.txt")
+        $lines = info.splitlines()
+        $print(id)
+        $print(lines)
+        $system= lines[2*id - 2]
+        $print(system)
+
+        $ gpt_thread = threading.Thread(target=get_gpt_response, args=(system,ask, history, response_container,id))
+        $ gpt_thread.start()
+        while not ok:
+             $renpy.pause(0.5, hard=True)
+        $ response = response_container[0]
+        $ renpy.sound.play("audio/response.wav", channel='sound')
+        $ renpy.say(character, f"『{response}』")
+        $ history.append({"role": "assistant", "content": response})
+        $ history.append({"role": "user", "content": ask})
     return
 
 
@@ -109,5 +171,6 @@ label start:
             scene expression background_image with fade
         if character_image:
             show expression character_image at small_center with dissolve
-        $ renpy.say(characters[character_name], text)
+        $ text = text[:-1]
+        $ renpy.say(characters[character_name], f"『{text}』"if character_name != "" else text)
     return

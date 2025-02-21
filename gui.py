@@ -2,6 +2,7 @@ import configparser
 import os
 import shutil
 import sys
+import time
 import webbrowser
 from urllib.parse import urlparse, parse_qs
 import requests
@@ -15,10 +16,17 @@ from qfluentwidgets import NavigationItemPosition, LineEdit, TitleLabel, \
     InfoBar, InfoBarPosition, CardWidget, IconWidget, HyperlinkCard, HorizontalFlipView, PrimaryPushButton, \
     StrongBodyLabel, HyperlinkButton, PasswordLineEdit, FluentWindow, Dialog, IndeterminateProgressBar, MessageBoxBase, \
     SubtitleLabel, QConfig, ConfigItem, SwitchSettingCard, BoolValidator, qconfig, OptionsConfigItem, OptionsValidator, \
-    ComboBoxSettingCard, TextEdit, ProgressBar
+    ComboBoxSettingCard, TextEdit, ProgressBar, OptionsSettingCard, PushSettingCard, PrimaryPushSettingCard, \
+    SingleDirectionScrollArea
 import update
 import subprocess
-from main import gpt, generate_audio, generate_image, online_generate, online_generate_audio
+from GPT import gpt
+from local_image_generator import generate_image
+from local_vocal_generator import generate_audio
+from cloud_vocal_generator import online_generate_audio
+from cloud_image_generator import online_generate_image
+import threading
+import zipfile
 
 config = configparser.ConfigParser()
 config.read('config.ini', "utf-8")
@@ -32,6 +40,8 @@ aigal_log_path = os.path.join(parent_directory_of_cwd, "log.txt")
 class MainWindow(FluentWindow):
     def __init__(self):
         super().__init__()
+        self.snapshot_folder = "snapshot"  # 快照文件夹路径
+        self.snapshots = self.get_snapshots()
         self.setWindowTitle("AI GAL 启动器")
         self.navigationInterface.setExpandWidth(200)
         self.setWindowIcon(QIcon("icon.ico"))
@@ -44,6 +54,7 @@ class MainWindow(FluentWindow):
         self.gpt_sovits_page = self.create_gpt_sovits_page("GPT-SOVITS")
         self.ai_music_page = self.create_ai_music_page("AI 音乐")
         self.story_page = self.create_story_page("剧情")
+        self.snapshot_page = self.create_snapshot_page("快照")
         self.make_logs_page = self.create_make_logs_page("日志")
         self.downloads_page = self.create_downloads_page("资源下载")
         self.options_page = self.create_options_page("设置")
@@ -57,6 +68,7 @@ class MainWindow(FluentWindow):
         self.addSubInterface(self.gpt_sovits_page, FluentIcon.MICROPHONE, "GPT-SOVITS")
         self.addSubInterface(self.ai_music_page, FluentIcon.MUSIC, "AI 音乐")
         self.addSubInterface(self.story_page, FluentIcon.LABEL, "剧情")
+        self.addSubInterface(self.snapshot_page, FluentIcon.SAVE, "快照")
         self.addSubInterface(self.make_logs_page, FluentIcon.DOCUMENT, "日志")
         self.addSubInterface(self.downloads_page, FluentIcon.CLOUD_DOWNLOAD, "资源下载")
         self.addSubInterface(self.options_page, FluentIcon.SETTING, "设置", NavigationItemPosition.BOTTOM)
@@ -65,7 +77,7 @@ class MainWindow(FluentWindow):
         self.resize(1280, 720)
         self.setWindowTitle("AI GAL 启动器")
 
-    def create_page(self, object_name, text):
+    def create_page(self, object_name):
         page = QWidget()
         page.setObjectName(object_name)
         return page
@@ -117,7 +129,7 @@ class MainWindow(FluentWindow):
 
         layout.addStretch(1)
 
-        bottom_left_label = StrongBodyLabel("AI GAL版本:1.4")
+        bottom_left_label = StrongBodyLabel("""AI GAL版本:1.5\nqq群:982330586""")
         bottom_left_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
         bottom_left_label.setStyleSheet("font-size: 16px; margin: 10px;")
 
@@ -155,7 +167,7 @@ class MainWindow(FluentWindow):
             audio_folder = "./audio"
             music_folder = "./music"
             cache_folder = "./cache"
-            folders_to_delete = [audio_folder, music_folder, image_folder,cache_folder]
+            folders_to_delete = [audio_folder, music_folder, image_folder, cache_folder]
             for folder in folders_to_delete:
                 for filename in os.listdir(folder):
                     file_path = os.path.join(folder, filename)
@@ -230,7 +242,7 @@ class MainWindow(FluentWindow):
                 )
                 return
         self.success_tips("开启成功！准备开始游戏")
-        QTimer.singleShot(1000, lambda: subprocess.Popen(aigal_exe_path))
+        QTimer.singleShot(1000, lambda: subprocess.Popen([aigal_exe_path]))
 
     def try_run(self):
         sovits_if_cloud = config.getboolean("SOVITS", "if_cloud")
@@ -245,7 +257,7 @@ class MainWindow(FluentWindow):
 
         if draw_if_cloud:
             try:
-                response = online_generate("a girl", "character")
+                response = online_generate_image("a girl", "test", "character")
                 count += 1
                 if response == "error":
                     self.error_tips("云端绘画配置未成功")
@@ -274,7 +286,7 @@ class MainWindow(FluentWindow):
                 self.error_tips("云端语音配置未成功")
         else:
             try:
-                response = generate_audio("V2", "a girl", "test", "character")
+                response = generate_audio("V2", "测试", 1, "character")
                 if response == "error":
                     print("本地语音配置未成功")
                     self.error_tips("本地语音配置未成功")
@@ -302,6 +314,7 @@ class MainWindow(FluentWindow):
 
         theme = self.config.get('剧情', 'theme', fallback='')
         outline = self.config.get('剧情', 'outline', fallback='')
+        theme_language = self.config.get('剧情', 'Language', fallback='')
 
         button = TransparentToolButton(FluentIcon.FOLDER_ADD)
         button.setMinimumSize(50, 40)
@@ -314,10 +327,17 @@ class MainWindow(FluentWindow):
         input_field1.setMinimumHeight(40)
 
         input_field2 = LineEdit(page)
-        input_field2.setPlaceholderText("大纲地址")
-        input_field2.setReadOnly(True)
+        input_field2.setPlaceholderText("大纲文件地址")
         input_field2.setText(outline)
         input_field2.setMinimumHeight(40)
+
+        comboBox = ComboBox()
+        items = ['中文', '英文', '日文']
+        comboBox.addItems(items)
+        comboBox.currentIndexChanged.connect(
+            lambda idx: self.save_config('剧情', 'Language', items[idx])
+        )
+        comboBox.setCurrentIndex(items.index(theme_language) if theme_language in items else 2)
 
         h_layout = QHBoxLayout()
         h_layout.addWidget(input_field2)
@@ -327,18 +347,119 @@ class MainWindow(FluentWindow):
         input_layout.addLayout(h_layout)
 
         layout.addWidget(title_label)
+        layout.addWidget(comboBox)
         layout.addLayout(input_layout)
 
         input_field1.textChanged.connect(
-            lambda: self.save_config('剧情', 'theme', input_field2.text()))
+            lambda: self.save_config('剧情', 'theme', input_field1.text()))
         input_field2.textChanged.connect(lambda: self.save_config('剧情', 'outline', input_field2.text()))
 
         return page
 
+    def create_snapshot_page(self, title):
+        page = QWidget()
+        page.setObjectName("snapshot_page")
+        layout = QVBoxLayout(page)
+        layout.setAlignment(Qt.AlignTop)
+
+        # 创建标题标签
+        title_label = TitleLabel(f"{title} 页面", page)
+        title_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        title_label.setStyleSheet("font-size: 24px; margin: 10px;")
+
+        scroll_area = SingleDirectionScrollArea(orient=Qt.Vertical)
+
+        view = QWidget()
+        input_layout = QVBoxLayout(view)
+        input_layout.setSpacing(20)
+        # input_layout.setContentsMargins(500, 10, 500, 10)
+
+        # 将布局对齐方式设置为居中
+        input_layout.setAlignment(Qt.AlignTop)
+
+        # 创建保存快照按钮并将其放入居中的水平布局
+        save_button = PrimaryPushButton('保存当前快照', page)
+        save_button.clicked.connect(self.save_snapshot)
+        save_button.setMinimumSize(200, 50)
+
+        save_button_layout = QHBoxLayout()
+        save_button_layout.addWidget(save_button)
+        save_button_layout.setAlignment(Qt.AlignCenter)  # 水平布局中的按钮居中
+
+        input_layout.addLayout(save_button_layout)
+
+        # 动态创建还原快照的按钮并居中
+        for snapshot_name in self.snapshots:
+            snapshot_name = snapshot_name.removesuffix(".zip")
+            restore_button = PushButton(f"还原快照 {snapshot_name}", page)
+            restore_button.setMinimumSize(200, 50)
+            restore_button.clicked.connect(
+                lambda _, name=snapshot_name: self.restore_snapshot(name))  # 使用lambda确保传递正确的snapshot_name
+
+            restore_button_layout = QHBoxLayout()
+            restore_button_layout.addWidget(restore_button)
+            restore_button_layout.setAlignment(Qt.AlignCenter)  # 水平布局中的按钮居中
+
+            input_layout.addLayout(restore_button_layout)
+
+        scroll_area.setWidget(view)
+        scroll_area.setStyleSheet("QScrollArea{background: transparent; border: none}")
+        view.setStyleSheet("QWidget{background: transparent}")
+
+        # 将标题和滚动区域添加到主布局
+        layout.addWidget(title_label)
+        layout.addWidget(scroll_area)
+
+        return page
+
+    def packer(self, title):
+
+        directories = ["audio", "images", "music"]
+        files = ["characters.txt", "character_info.txt", "choice.txt", "story.txt", "dialogues.json"]
+
+        zip_filename = f"snapshot/{title}.zip"
+        with zipfile.ZipFile(zip_filename, 'w') as zipf:
+            for directory in directories:
+                for root, dirs, files_in_dir in os.walk(directory):
+                    for file in files_in_dir:
+                        file_path = os.path.join(root, file)
+                        zipf.write(file_path, os.path.relpath(file_path, os.getcwd()))
+            for file in files:
+                zipf.write(file)
+
+    def get_snapshots(self):
+        """获取 snapshot 文件夹中的所有 .zip 文件作为快照"""
+        snapshot_files = []
+        if os.path.exists(self.snapshot_folder):
+            for filename in os.listdir(self.snapshot_folder):
+                if filename.endswith(".zip"):  # 只关心 .zip 文件
+                    snapshot_files.append(filename)
+        return snapshot_files
+
+    def save_snapshot(self):
+        """保存当前页面状态为一个新的快照 zip 文件"""
+        with open("title.txt", "r", encoding="utf-8") as file:
+            title = file.read()
+        snapshot_name = title
+        snapshot_path = os.path.join(self.snapshot_folder, snapshot_name)
+
+        self.packer(snapshot_name)
+        self.success_tips(f"保存快照到 {snapshot_path}")
+        self.snapshots = self.get_snapshots() 
+
+    def restore_snapshot(self, snapshot_name):
+        """根据压缩包名字还原快照"""
+        snapshot_path = os.path.join(self.snapshot_folder, f"{snapshot_name}.zip")
+        if os.path.exists(snapshot_path):
+            with zipfile.ZipFile(f"snapshot/{snapshot_name}.zip", 'r') as zip_ref:
+                zip_ref.extractall(".")
+            self.success_tips(f"成功还原快照 {snapshot_name}")
+        else:
+            self.error_tips(f"找不到快照 {snapshot_name}，无法还原。")
+
     def create_make_logs_page(self, title):
         page = QWidget()
         page.setObjectName("make_logs_page")
-
         layout = QVBoxLayout(page)
         layout.setAlignment(Qt.AlignTop)
 
@@ -681,57 +802,31 @@ class MainWindow(FluentWindow):
         page_title.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px 0;")
         main_layout.addWidget(page_title)
 
-        class Config(QConfig):
-            enableAcrylicBackground = ConfigItem("MainWindow", "EnableAcrylicBackground", False, BoolValidator())
-
-        cfg = Config()
-        qconfig.load("config.json", cfg)
-
         card = SwitchSettingCard(
             icon=FluentIcon.TRANSPARENT,
-            title="启用亚克力效果",
-            content="亚克力效果的视觉体验更好，但是可能导致窗口卡顿",
-            configItem=cfg.enableAcrylicBackground
+            title="自动更新",
+            content="软件启动时自动检查更新",
         )
+        card.checkedChanged.connect(self.on_auto_update_toggle)
         main_layout.addWidget(card)
 
-        class Config(QConfig):
-            dpiScale = OptionsConfigItem(
-                "MainWindow", "DpiScale", "Auto", OptionsValidator([1, 1.25, 1.5, 1.75, 2, "Auto"]), restart=True)
-
-        cfg = Config()
-        qconfig.load("config.json", cfg)
-
-        card = ComboBoxSettingCard(
-            configItem=cfg.dpiScale,
-            icon=FluentIcon.ZOOM,
-            title="界面缩放",
-            content="调整组件和字体的大小",
-            texts=["100%", "125%", "150%", "175%", "200%", "跟随系统设置"]
+        card = SwitchSettingCard(
+            icon=FluentIcon.BRUSH,
+            title="深色模式",
+            content="更适合在夜晚使用",
         )
-
+        card.checkedChanged.connect(self.on_theme_change)
         main_layout.addWidget(card)
-        cfg.dpiScale.valueChanged.connect(print)
 
-        # 添加分组
-        main_layout.addWidget(self.create_section("个性化", [
-            self.create_card("应用主题", "调整视觉的外观", FluentIcon.PALETTE,
-                             self.create_combo(["浅色", "深色"], self.on_theme_change))
-        ]))
+        card = PushSettingCard(
+            text="开始",
+            icon=FluentIcon.DOWNLOAD,
+            title="试运行",
+            content="模拟运行看有没有问题"
+        )
+        card.clicked.connect(self.try_run)
+        main_layout.addWidget(card)
 
-        main_layout.addWidget(self.create_section("软件更新", [
-            self.create_card("自动更新", "在应用启动时检查更新", FluentIcon.UPDATE,
-                             self.create_switch(self.on_auto_update_toggle))
-        ]))
-
-        main_layout.addWidget(self.create_section("关于", [
-            self.create_card("试运行", "看看配置有没有出错", FluentIcon.PLAY_SOLID,
-                             self.create_button("开始", self.try_run)),
-            self.create_card("检查更新", "看看有没有新版本", FluentIcon.CLOUD_DOWNLOAD,
-                             self.create_button("检查更新", self.on_check_update_clicked))
-        ]))
-
-        main_layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
         gpt_sovits_card = HyperlinkCard(
             url="https://tamikip.github.io/AI-GAL-doc",
             text="查看",
@@ -740,6 +835,17 @@ class MainWindow(FluentWindow):
             content="不会使用？来看！"
         )
         main_layout.addWidget(gpt_sovits_card)
+
+        card = PrimaryPushSettingCard(
+            text="检查更新",
+            icon=FluentIcon.INFO,
+            title="关于",
+            content="© 版权所有2025，TamikiP.当前版本1.5"
+        )
+        card.clicked.connect(self.on_check_update_clicked)
+        main_layout.addWidget(card)
+
+        main_layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
         return options_page
 
@@ -792,74 +898,14 @@ class MainWindow(FluentWindow):
 
         return downloads_page
 
-    def create_section(self, title, cards):
-        section_layout = QVBoxLayout()
-        section_label = TitleLabel(title)
-        section_label.setStyleSheet("font-size: 20px; font-weight: bold; margin: 10px 0;")
-        section_layout.addWidget(section_label)
-
-        for card in cards:
-            section_layout.addWidget(card)
-        return self.wrap_in_widget(section_layout)
-
-    def create_card(self, title, subtitle, icon, control):
-        card = CardWidget(self)
-        card_layout = QHBoxLayout()
-
-        icon_widget = IconWidget(icon, self)
-        icon_widget.setFixedSize(32, 32)
-
-        text_layout = QVBoxLayout()
-        title_label = TitleLabel(title)
-        title_label.setStyleSheet("font-size: 14px;")
-        subtitle_label = QLabel(subtitle)
-        subtitle_label.setStyleSheet("font-size: 12px; color: gray;")
-        text_layout.addWidget(title_label)
-        text_layout.addWidget(subtitle_label)
-
-        left_layout = QHBoxLayout()
-        left_layout.addWidget(icon_widget)
-        left_layout.addLayout(text_layout)
-
-        card_layout.addLayout(left_layout)
-        card_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
-        card_layout.addWidget(control)
-
-        card.setLayout(card_layout)
-        return card
-
-    def create_combo(self, items, on_change_callback):
-        combo = ComboBox(self)
-        combo.addItems(items)
-        combo.currentIndexChanged.connect(on_change_callback)
-        return combo
-
-    def create_switch(self, on_toggle_callback):
-        switch = SwitchButton()
-        switch.setChecked(auto_update)
-        switch.checkedChanged.connect(on_toggle_callback)
-        return switch
-
-    def create_button(self, text, on_click_callback):
-        button = PushButton(text, self)
-        button.clicked.connect(on_click_callback)
-        return button
-
-    def wrap_in_widget(self, layout):
-        widget = QWidget()
-        widget.setLayout(layout)
-        return widget
-
     def on_theme_change(self, index):
-        themes = ["浅色", "深色"]
-        selected_theme = themes[index]
-        if selected_theme == "浅色":
-            setTheme(Theme.LIGHT)
-        else:
+        if index:
             setTheme(Theme.DARK)
+        else:
+            setTheme(Theme.LIGHT)
         InfoBar.success(
             title="主题已切换",
-            content=f"当前主题: {selected_theme}",
+            content="",
             position=InfoBarPosition.TOP_RIGHT,
             parent=self
         )
@@ -897,7 +943,6 @@ class CustomMessageBox(MessageBoxBase):
         self.titleLabel = SubtitleLabel('更新中,请勿退出')
         self.bar = IndeterminateProgressBar(start=True)
 
-        # 将组件添加到布局中
         self.viewLayout.addWidget(self.titleLabel)
         self.viewLayout.addWidget(self.bar)
         self.widget.setMinimumSize(500, 200)
