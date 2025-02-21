@@ -33,6 +33,10 @@
 4. 修复了一些已知bug
 5. 新增了一张壁纸
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=tamikip/AI-GAL&type=Date)](https://star-history.com/#tamikip/AI-GAL&Date
+
 
 # 在开始使用之前
 - ~~首先确保您有一台4GB显存以上，10系以上的显卡。用于运行ai绘画与ai语音~~ 1.1可以自己选择本地还是云端模式
