@@ -43,8 +43,8 @@
 3. rembg（在整合包里有）
 
 
-项目文档：https://tamikip.github.io/AI-GAL-doc/
-qq群:982330586
+- 项目文档：https://tamikip.github.io/AI-GAL-doc/
+- qq群:982330586
 # AI-GAL有什么用？
 https://github.com/user-attachments/assets/2ef16f6e-4650-4bca-995f-d662b39b4542
 
