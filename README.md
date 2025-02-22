@@ -45,7 +45,6 @@
 - 安装好以下程序（云端模式无需理会1和2）：
 1. stable diffusion
 2. gpt-sovits(可以用其他替代，但是要自己改代码)
-3. rembg（在整合包里有）
 
 
 - 项目文档：https://tamikip.github.io/AI-GAL-doc/
@@ -61,7 +60,6 @@ https://github.com/user-attachments/assets/2ef16f6e-4650-4bca-995f-d662b39b4542
 - **图像生成：**  
   - 利用AI绘画API生成角色和背景图像。  
   - 支持本地和云端绘图模式。  
-  - 提供去除图像背景的功能。
 
 ## 2. 音频生成
 - **通过AI合成角色的语音对话。**  
@@ -78,12 +76,11 @@ https://github.com/user-attachments/assets/2ef16f6e-4650-4bca-995f-d662b39b4542
 
 ## 正式开始
 ### 在第一次打开游戏时，你首先要：
-- 安装rembg，stable-diffusion，gpt-sovits
+- 安装stable-diffusion，gpt-sovits
 - 填写配置参数
-### 在运行程序之前，你首先要（云端模式忽略1和2）：
+### 在运行程序之前，你首先要（云端模式忽略）：
 1. 运行stable diffusion的api
 2. 运行gpt-sovits的api
-3. 运行rembg的api
 
 ### 请从Launcher中进入游戏，资源加载速度取决于您的电脑配置，请耐心等待
 
