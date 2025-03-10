@@ -40,18 +40,15 @@
 
 
 # 在开始使用之前
-- ~~首先确保您有一台4GB显存以上，10系以上的显卡。用于运行ai绘画与ai语音~~ 1.1可以自己选择本地还是云端模式
-- chatgpt的密钥（或者本地部署LLM）
-- 安装好以下程序（云端模式无需理会1和2）：
+- 大语言模型的密钥（或者本地部署LLM）
+- 安装好以下程序（本地）：
 1. stable diffusion
-2. gpt-sovits(可以用其他替代，但是要自己改代码)
+2. gpt-sovits
 
 
 - 项目文档：https://tamikip.github.io/AI-GAL-doc/
 - qq群:982330586
 # AI-GAL有什么用？
-https://github.com/user-attachments/assets/2ef16f6e-4650-4bca-995f-d662b39b4542
-
 
 ## 1. 剧情生成
 - **使用GPT模型生成：**  
