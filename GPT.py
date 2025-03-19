@@ -26,7 +26,7 @@ def gpt(system, prompt, json_mode=False):
     model = config.get('CHATGPT', 'model')
     response_format = {'type': 'json_object'}
     if json_mode:
-        json_mode = config.getboolean("Settings", "jsom_mode")
+        json_mode = config.getboolean("Settings", "json_mode")
 
     messages = []
     if system is not None:
