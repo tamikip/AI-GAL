@@ -53,9 +53,8 @@ def gpt(system, prompt, json_mode=False):
     # 去除思考模型的部分
     content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
     # 为了防止不支持json格式的模型额外输出，利用正则提取json内容,原理是提取花括号
-    if not json_mode:
-        match = re.search(r'\{.*\}', content, re.DOTALL)
-        content = match.group(0) if match else content
+    match = re.search(r'\{.*\}', content, re.DOTALL)
+    content = match.group(0) if match else content
     print(content)
     return content
 
