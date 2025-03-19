@@ -4,16 +4,16 @@ import requests
 import json
 import time
 import os
+
 try:
     import renpy
     game_directory = renpy.config.gamedir
 except:
     game_directory = os.getcwd()
-images_directory = os.path.join(game_directory, "images")
 
+images_directory = os.path.join(game_directory, "images")
 config = configparser.ConfigParser()
 config.read(rf"{game_directory}\config.ini", encoding='utf-8')
-
 online_draw_key = config.get('AI绘画', 'draw_key')
 url = "https://cn.tensorart.net/v1/jobs"
 online_draw_headers = {
@@ -36,11 +36,12 @@ def online_generate(prompt, mode):
     else:
         width = 512
         height = 768
-        prompt2 = "(upper_body),solo" + prompt
+        prompt2 = "masterpiece,wallpaper,(upper_body),face focus,solo,looking at the viewer,((front_view,standing_illustration))," + prompt
         if config.get('AI绘画', 'background_id'):
             model = config.get('AI绘画', 'background_id')
         else:
             model = "611437926598989702"
+
     data = {
         "request_id": str(requests_id),
         "stages": [
@@ -89,7 +90,6 @@ def online_generate(prompt, mode):
         ]
     }
     response = requests.post(url, headers=online_draw_headers, data=json.dumps(data))
-
     if response.status_code == 200:
         id = json.loads(response.text)['job']['id']
         return id

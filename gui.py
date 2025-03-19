@@ -2,21 +2,19 @@ import configparser
 import os
 import shutil
 import sys
-import time
 import webbrowser
 from urllib.parse import urlparse, parse_qs
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QIcon, QTextCursor
-from PyQt5.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QHBoxLayout, QLabel, \
+from PyQt5.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QHBoxLayout, \
     QWidget, QSpacerItem, QSizePolicy, QGridLayout
 from qfluentwidgets import NavigationItemPosition, LineEdit, TitleLabel, \
-    TogglePushButton, TransparentToolButton, ComboBox, PushButton, SwitchButton, FluentIcon, Theme, setTheme, \
-    InfoBar, InfoBarPosition, CardWidget, IconWidget, HyperlinkCard, HorizontalFlipView, PrimaryPushButton, \
+    TogglePushButton, TransparentToolButton, ComboBox, PushButton, FluentIcon, Theme, setTheme, \
+    InfoBar, InfoBarPosition, HyperlinkCard, HorizontalFlipView, PrimaryPushButton, \
     StrongBodyLabel, HyperlinkButton, PasswordLineEdit, FluentWindow, Dialog, IndeterminateProgressBar, MessageBoxBase, \
-    SubtitleLabel, QConfig, ConfigItem, SwitchSettingCard, BoolValidator, qconfig, OptionsConfigItem, OptionsValidator, \
-    ComboBoxSettingCard, TextEdit, ProgressBar, OptionsSettingCard, PushSettingCard, PrimaryPushSettingCard, \
+    SubtitleLabel, SwitchSettingCard, TextEdit, ProgressBar, PushSettingCard, PrimaryPushSettingCard, \
     SingleDirectionScrollArea
 import update
 import subprocess
@@ -25,7 +23,6 @@ from local_image_generator import generate_image
 from local_vocal_generator import generate_audio
 from cloud_vocal_generator import online_generate_audio
 from cloud_image_generator import online_generate_image
-import threading
 import zipfile
 
 config = configparser.ConfigParser()
@@ -129,7 +126,7 @@ class MainWindow(FluentWindow):
 
         layout.addStretch(1)
 
-        bottom_left_label = StrongBodyLabel("""AI GAL版本:1.5\nqq群:982330586""")
+        bottom_left_label = StrongBodyLabel("""AI GAL版本:1.6\nqq群:982330586""")
         bottom_left_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
         bottom_left_label.setStyleSheet("font-size: 16px; margin: 10px;")
 
@@ -183,7 +180,7 @@ class MainWindow(FluentWindow):
 
     def restart(self):
         os.remove('story.txt')
-        with open('story.txt', 'w') as file:
+        with open('story.txt', 'w'):
             pass
         self.success_tips("已经重置游戏")
 
@@ -198,7 +195,6 @@ class MainWindow(FluentWindow):
     def Start_game(self):
         sovits_url = "http://localhost:9880/"
         sd_url = "http://localhost:7860/"
-        rembg_url = "http://localhost:7000/"
         config.read('config.ini', "utf-8")
         if not config.getboolean("SOVITS", "if_cloud"):
             if self.check_web_port(sovits_url):
@@ -222,19 +218,6 @@ class MainWindow(FluentWindow):
                 InfoBar.error(
                     title='本地绘画服务出错',
                     content="请检查是否已开启本地绘画服务",
-                    orient=Qt.Vertical,
-                    position=InfoBarPosition.BOTTOM_RIGHT,
-                    duration=-1,
-                    parent=window
-                )
-                return
-            if self.check_web_port(rembg_url):
-                print("rembg开启成功！")
-            else:
-                print("rembg出现问题，请检查是否已开启rembg")
-                InfoBar.error(
-                    title='rembg服务出错',
-                    content="请检查是否已开启rembg",
                     orient=Qt.Vertical,
                     position=InfoBarPosition.BOTTOM_RIGHT,
                     duration=-1,
@@ -394,11 +377,11 @@ class MainWindow(FluentWindow):
             restore_button = PushButton(f"还原快照 {snapshot_name}", page)
             restore_button.setMinimumSize(200, 50)
             restore_button.clicked.connect(
-                lambda _, name=snapshot_name: self.restore_snapshot(name))  # 使用lambda确保传递正确的snapshot_name
+                lambda _, name=snapshot_name: self.restore_snapshot(name))
 
             restore_button_layout = QHBoxLayout()
             restore_button_layout.addWidget(restore_button)
-            restore_button_layout.setAlignment(Qt.AlignCenter)  # 水平布局中的按钮居中
+            restore_button_layout.setAlignment(Qt.AlignCenter)
 
             input_layout.addLayout(restore_button_layout)
 
@@ -445,7 +428,7 @@ class MainWindow(FluentWindow):
 
         self.packer(snapshot_name)
         self.success_tips(f"保存快照到 {snapshot_path}")
-        self.snapshots = self.get_snapshots() 
+        self.snapshots = self.get_snapshots()
 
     def restore_snapshot(self, snapshot_name):
         """根据压缩包名字还原快照"""
@@ -533,21 +516,18 @@ class MainWindow(FluentWindow):
         layout.addLayout(input_layout)
 
         input_field1.textChanged.connect(
-            lambda: self.save_config('CHATGPT', 'base_url', f"https://{input_field1.text()}/v1/chat/completions"))
+            lambda: self.save_config('CHATGPT', 'base_url', input_field1.text()))
         input_field2.textChanged.connect(lambda: self.save_config('CHATGPT', 'model', input_field2.text()))
         input_field3.textChanged.connect(lambda: self.save_config('CHATGPT', 'gpt_key', input_field3.text()))
 
         return page
 
     def save_config(self, section, key, value):
-        try:
-            if section not in self.config:
-                self.config.add_section(section)
-            self.config[section][key] = value
-            with open('config.ini', 'w', encoding="utf-8") as configfile:
-                self.config.write(configfile)
-        except Exception as e:
-            print(f"Error saving config: {e}")
+        if section not in self.config:
+            self.config.add_section(section)
+        self.config[section][key] = value
+        with open('config.ini', 'w', encoding="utf-8") as configfile:
+            self.config.write(configfile)
 
     def create_ai_painting_page(self, title):
         page = QWidget()
@@ -559,6 +539,7 @@ class MainWindow(FluentWindow):
         title_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         title_label.setStyleSheet("font-size: 24px; margin: 10px;")
 
+        if_ComfyUI = self.config.getboolean('AI绘画', 'if_ComfyUI', fallback=False)
         if_cloud = self.config.getboolean('AI绘画', 'if_cloud', fallback=False)
         draw_key = self.config.get('AI绘画', 'draw_key', fallback='')
         character_id = self.config.get('AI绘画', 'character_id', fallback='')
@@ -567,8 +548,14 @@ class MainWindow(FluentWindow):
         toggle_button = TogglePushButton(FluentIcon.CLOUD, '云端模式')
         toggle_button.setChecked(if_cloud)
 
+        toggle_button2 = TogglePushButton(FluentIcon.IOT, 'ComfyUI')
+        toggle_button2.setChecked(if_ComfyUI)
+
         toggle_button.toggled.connect(
             lambda checked: self.save_config('AI绘画', 'if_cloud', str(checked)))
+
+        toggle_button2.toggled.connect(
+            lambda checked: self.save_config('AI绘画', 'if_ComfyUI', str(checked)))
 
         input_layout = QVBoxLayout()
         input_layout.setSpacing(40)
@@ -592,6 +579,7 @@ class MainWindow(FluentWindow):
         switch_layout = QHBoxLayout()
         switch_layout.setAlignment(Qt.AlignLeft)
         switch_layout.addWidget(toggle_button)
+        switch_layout.addWidget(toggle_button2)
 
         layout.addWidget(title_label)
         layout.addLayout(switch_layout)
@@ -612,7 +600,6 @@ class MainWindow(FluentWindow):
         layout = QVBoxLayout(page)
         layout.setAlignment(Qt.AlignTop)
 
-        # Add title label
         title_label = TitleLabel(f"{title} 页面", page)
         title_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         title_label.setStyleSheet("font-size: 24px; margin: 10px;")
@@ -740,7 +727,6 @@ class MainWindow(FluentWindow):
     def openFileDialog(self, lineEdit, type):
         options = QFileDialog.Options()
         fileName, _ = QFileDialog.getOpenFileName(self, "选择文件", "", type, options=options)
-
         if fileName:
             lineEdit.setText(fileName)
 
@@ -818,6 +804,14 @@ class MainWindow(FluentWindow):
         card.checkedChanged.connect(self.on_theme_change)
         main_layout.addWidget(card)
 
+        card = SwitchSettingCard(
+            icon=FluentIcon.CODE,
+            title="强制json输出",
+            content="兼容JsonMode的模型可以有效提高准确性，推荐开启，如果剧情生成失败可尝试关闭，本地LLM请关闭此选项",
+        )
+        card.checkedChanged.connect(self.json_mode)
+        main_layout.addWidget(card)
+
         card = PushSettingCard(
             text="开始",
             icon=FluentIcon.DOWNLOAD,
@@ -869,6 +863,15 @@ class MainWindow(FluentWindow):
         )
         main_layout.addWidget(ai_draw_card)
 
+        ai_draw_model_card = HyperlinkCard(
+            url="https://tusiart.com/",
+            text="下载",
+            icon=FluentIcon.CLOUD,
+            title="吐司AI",
+            content="AI绘画模型资源，云端模型也可以在这里看模型id"
+        )
+        main_layout.addWidget(ai_draw_model_card)
+
         gpt_sovits_card = HyperlinkCard(
             url="https://www.123pan.com/s/5tIqVv-GVRcv.html",
             text="下载",
@@ -886,15 +889,6 @@ class MainWindow(FluentWindow):
             content="各种各样的模型资源"
         )
         main_layout.addWidget(gpt_sovits_model_card)
-
-        rembg_card = HyperlinkCard(
-            url="https://github.com/danielgatis/rembg/releases/download/v2.0.60/rembg-cli-installer.exe",
-            text="下载",
-            icon=FluentIcon.PHOTO,
-            title="Rembg下载",
-            content="用于本地SD的抠图(下载可能要魔法)"
-        )
-        main_layout.addWidget(rembg_card)
 
         return downloads_page
 
@@ -919,6 +913,15 @@ class MainWindow(FluentWindow):
 
         InfoBar.info("自动更新", f"自动更新已{status}", position=InfoBarPosition.TOP_RIGHT, parent=self)
 
+    def json_mode(self, checked):
+        status = "启用" if checked else "禁用"
+        if status == "启用":
+            self.save_config("Settings", "json_mode", "True")
+        else:
+            self.save_config("Settings", "json_mode", "False")
+
+        InfoBar.info("JSON模式", f"JSON模式已{status}", position=InfoBarPosition.TOP_RIGHT, parent=self)
+
     def on_check_update_clicked(self):
         if updater():
             InfoBar.success(
@@ -942,7 +945,6 @@ class CustomMessageBox(MessageBoxBase):
         super().__init__(parent)
         self.titleLabel = SubtitleLabel('更新中,请勿退出')
         self.bar = IndeterminateProgressBar(start=True)
-
         self.viewLayout.addWidget(self.titleLabel)
         self.viewLayout.addWidget(self.bar)
         self.widget.setMinimumSize(500, 200)

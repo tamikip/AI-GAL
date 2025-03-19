@@ -14,13 +14,54 @@ except:
 config = configparser.ConfigParser()
 config.read(rf"{game_directory}\config.ini", encoding='utf-8')
 
-import json
-import requests
-import re
+headers = {
+    'Content-Type': 'application/json',
+    'Authorization': f'Bearer {config.get("CHATGPT", "GPT_KEY")}'
+}
 
 
-def gpt(system, prompt, mode="common", history=None):
-    gpt_key = config.get('CHATGPT', 'GPT_KEY')
+def gpt(system, prompt, json_mode=False):
+    """普通的gpt调用"""
+    gpt_url = config.get('CHATGPT', 'BASE_URL')
+    model = config.get('CHATGPT', 'model')
+    response_format = {'type': 'json_object'}
+    if json_mode:
+        json_mode = config.getboolean("Settings", "jsom_mode")
+
+    messages = []
+    if system is not None:
+        messages.append({
+            "role": "system",
+            "content": system
+        })
+
+    messages.append({
+        "role": "user",
+        "content": prompt
+    })
+
+    payload = json.dumps({
+        "model": model,
+        "temperature": 0.8,
+        **({"response_format": response_format} if json_mode else {}),
+        "messages": messages
+    })
+
+    response = requests.post(gpt_url, headers=headers, data=payload)
+    parsed_data = json.loads(response.text)
+    content = parsed_data['choices'][0]['message']['content']
+    # 去除思考模型的部分
+    content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
+    # 为了防止不支持json格式的模型额外输出，利用正则提取json内容,原理是提取花括号
+    if not json_mode:
+        match = re.search(r'\{.*\}', content, re.DOTALL)
+        content = match.group(0) if match else content
+    print(content)
+    return content
+
+
+def gpt_context(system, prompt, history):
+    """上下文模式的GPT对话函数"""
     gpt_url = config.get('CHATGPT', 'BASE_URL')
     model = config.get('CHATGPT', 'model')
 
@@ -29,21 +70,13 @@ def gpt(system, prompt, mode="common", history=None):
         {"role": "user", "content": prompt}
     ]
 
-    # 如果有历史对话，并且是上下文模式，将历史对话和当前对话合并
-    if mode == "context" and history:
-        messages = history + messages  # 将历史消息和当前消息合并
+    # 合并历史对话和当前对话
+    messages = history + messages
 
     payload = json.dumps({
         "model": model,
         "messages": messages
     })
-
-    headers = {
-        'Accept': 'application/json',
-        'Authorization': f'Bearer {gpt_key}',
-        'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
-        'Content-Type': 'application/json'
-    }
 
     response = requests.post(gpt_url, headers=headers, data=payload)
     content = json.loads(response.text)['choices'][0]['message']['content']
@@ -51,4 +84,5 @@ def gpt(system, prompt, mode="common", history=None):
     # 去除思考模型的部分
     content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
     return content
+
 
