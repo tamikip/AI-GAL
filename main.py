@@ -233,7 +233,7 @@ def main():
         file.write(f"{story_content}\n")
 
     with open(os.path.join(game_directory, 'title.txt'), 'w', encoding='utf-8') as file:
-        file.write(f"{title}\n")
+        file.write(f"{title}")
 
     with open(os.path.join(game_directory, 'character_info.txt'), 'w', encoding='utf-8') as file:
         file.write(characters)
@@ -273,6 +273,7 @@ def main():
                 if config.getboolean('AI绘画', 'if_cloud'):
                     online_generate_image(prompt, background[0], "background")
                 else:
+                    print("开始画背景")
                     generate_image(prompt, background[0], "background")
                 background_image = background[0]
                 background_list.append(background_image)

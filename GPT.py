@@ -6,7 +6,6 @@ import os
 
 try:
     import renpy
-
     game_directory = renpy.config.gamedir
 except:
     game_directory = os.getcwd()
@@ -52,10 +51,10 @@ def gpt(system, prompt, json_mode=False):
     content = parsed_data['choices'][0]['message']['content']
     # 去除思考模型的部分
     content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
+    print(content)
     # 为了防止不支持json格式的模型额外输出，利用正则提取json内容,原理是提取花括号
     match = re.search(r'\{.*\}', content, re.DOTALL)
     content = match.group(0) if match else content
-    print(content)
     return content
 
 

@@ -9,7 +9,6 @@ import shutil
 
 try:
     import renpy
-
     game_directory = renpy.config.gamedir
 except:
     game_directory = os.getcwd()
@@ -67,7 +66,7 @@ def generate_image(prompt, image_name, mode):
 
         payload = {
             "prompt": f"masterpiece,wallpaper,8k,detailed CG,{prompt},{prompt2}",
-            "negative_prompt": "EasyNagative,lowres, bad anatomy, text,cropped,low quality,(mutation, poorly drawn :1.2),"
+            "negative_prompt": "EasyNagative,lowres,bad anatomy,text,cropped,low quality,(mutation, poorly drawn:1.2),"
                                "normal quality, obesity,bad proportions,unnatural body,bad shadow, uncoordinated body, "
                                "worst quality,censored,low quality,signature,watermark, username, blurry,nsfw",
             "steps": 25,

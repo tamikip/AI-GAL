@@ -7,7 +7,7 @@ from urllib.parse import urlparse, parse_qs
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QIcon, QTextCursor
+from PyQt5.QtGui import QIcon, QTextCursor, QPixmap
 from PyQt5.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QHBoxLayout, \
     QWidget, QSpacerItem, QSizePolicy, QGridLayout
 from qfluentwidgets import NavigationItemPosition, LineEdit, TitleLabel, \
@@ -15,7 +15,7 @@ from qfluentwidgets import NavigationItemPosition, LineEdit, TitleLabel, \
     InfoBar, InfoBarPosition, HyperlinkCard, HorizontalFlipView, PrimaryPushButton, \
     StrongBodyLabel, HyperlinkButton, PasswordLineEdit, FluentWindow, Dialog, IndeterminateProgressBar, MessageBoxBase, \
     SubtitleLabel, SwitchSettingCard, TextEdit, ProgressBar, PushSettingCard, PrimaryPushSettingCard, \
-    SingleDirectionScrollArea
+    SingleDirectionScrollArea, CardWidget
 import update
 import subprocess
 from GPT import gpt
@@ -24,6 +24,7 @@ from local_vocal_generator import generate_audio
 from cloud_vocal_generator import online_generate_audio
 from cloud_image_generator import online_generate_image
 import zipfile
+from PIL import Image, ImageDraw, ImageFont
 
 config = configparser.ConfigParser()
 config.read('config.ini', "utf-8")
@@ -126,7 +127,7 @@ class MainWindow(FluentWindow):
 
         layout.addStretch(1)
 
-        bottom_left_label = StrongBodyLabel("""AI GAL版本:1.6\nqq群:982330586""")
+        bottom_left_label = StrongBodyLabel("AI GAL版本:1.6\nqq群:982330586")
         bottom_left_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
         bottom_left_label.setStyleSheet("font-size: 16px; margin: 10px;")
 
@@ -174,9 +175,8 @@ class MainWindow(FluentWindow):
                         shutil.rmtree(file_path)
 
             self.success_tips("资源清理完成")
-
         except Exception as e:
-            print(f"An error occurred: {e}")
+            self.error_tips(f"An error occurred: {e}")
 
     def restart(self):
         os.remove('story.txt')
@@ -200,7 +200,6 @@ class MainWindow(FluentWindow):
             if self.check_web_port(sovits_url):
                 print("语音开启成功！")
             else:
-                print("本地语音服务出现问题，请检查是否已开启本地语音服务")
                 InfoBar.error(
                     title='本地语音服务出错',
                     content="请检查是否已开启本地语音服务",
@@ -214,7 +213,6 @@ class MainWindow(FluentWindow):
             if self.check_web_port(sd_url):
                 print("绘画开启成功！")
             else:
-                print("本地绘画服务出现问题，请检查是否已开启本地绘画服务")
                 InfoBar.error(
                     title='本地绘画服务出错',
                     content="请检查是否已开启本地绘画服务",
@@ -260,23 +258,19 @@ class MainWindow(FluentWindow):
             try:
                 response = online_generate_audio("1", 1, "test")
                 if response == "error":
-                    print("云端语音配置未成功")
                     self.error_tips("云端语音配置未成功")
                 else:
                     count += 1
             except:
-                print("云端语音配置未成功")
                 self.error_tips("云端语音配置未成功")
         else:
             try:
                 response = generate_audio("V2", "测试", 1, "character")
                 if response == "error":
-                    print("本地语音配置未成功")
                     self.error_tips("本地语音配置未成功")
                 else:
                     count += 1
             except:
-                print("本地语音配置未成功")
                 self.error_tips("本地语音配置未成功")
         if count == 3:
             self.success_tips("测试完毕，暂未发现问题")
@@ -344,59 +338,79 @@ class MainWindow(FluentWindow):
         page.setObjectName("snapshot_page")
         layout = QVBoxLayout(page)
         layout.setAlignment(Qt.AlignTop)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(15)
 
-        # 创建标题标签
+        layout2 = QHBoxLayout()
         title_label = TitleLabel(f"{title} 页面", page)
         title_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        title_label.setStyleSheet("font-size: 24px; margin: 10px;")
+        title_label.setStyleSheet("font-size: 24px; margin-bottom: 15px;")
 
-        scroll_area = SingleDirectionScrollArea(orient=Qt.Vertical)
-
-        view = QWidget()
-        input_layout = QVBoxLayout(view)
-        input_layout.setSpacing(20)
-        # input_layout.setContentsMargins(500, 10, 500, 10)
-
-        # 将布局对齐方式设置为居中
-        input_layout.setAlignment(Qt.AlignTop)
-
-        # 创建保存快照按钮并将其放入居中的水平布局
         save_button = PrimaryPushButton('保存当前快照', page)
         save_button.clicked.connect(self.save_snapshot)
-        save_button.setMinimumSize(200, 50)
+        save_button.setMinimumSize(100, 50)
+        save_button.setFixedWidth(150)
 
-        save_button_layout = QHBoxLayout()
-        save_button_layout.addWidget(save_button)
-        save_button_layout.setAlignment(Qt.AlignCenter)  # 水平布局中的按钮居中
-
-        input_layout.addLayout(save_button_layout)
-
-        # 动态创建还原快照的按钮并居中
-        for snapshot_name in self.snapshots:
-            snapshot_name = snapshot_name.removesuffix(".zip")
-            restore_button = PushButton(f"还原快照 {snapshot_name}", page)
-            restore_button.setMinimumSize(200, 50)
-            restore_button.clicked.connect(
-                lambda _, name=snapshot_name: self.restore_snapshot(name))
-
-            restore_button_layout = QHBoxLayout()
-            restore_button_layout.addWidget(restore_button)
-            restore_button_layout.setAlignment(Qt.AlignCenter)
-
-            input_layout.addLayout(restore_button_layout)
-
-        scroll_area.setWidget(view)
+        scroll_area = SingleDirectionScrollArea(orient=Qt.Vertical)
         scroll_area.setStyleSheet("QScrollArea{background: transparent; border: none}")
-        view.setStyleSheet("QWidget{background: transparent}")
+        scroll_area.setWidgetResizable(True)
 
-        # 将标题和滚动区域添加到主布局
-        layout.addWidget(title_label)
-        layout.addWidget(scroll_area)
+        snapshot_list_widget = QWidget()
+        snapshot_list_layout = QVBoxLayout(snapshot_list_widget)
+        snapshot_list_layout.setSpacing(15)
+        snapshot_list_layout.setAlignment(Qt.AlignTop)
+        snapshot_list_layout.setContentsMargins(0, 0, 0, 0)
 
+        for snapshot_name in self.snapshots:
+            snapshot_base_name = snapshot_name.removesuffix(".zip")
+
+            card = CardWidget(snapshot_list_widget)
+            card_layout = QHBoxLayout(card)
+            card_layout.setContentsMargins(10, 10, 10, 10)
+            thumbnail_path = f"snapshot/{snapshot_base_name}.png"
+
+            if os.path.exists(thumbnail_path):
+                thumbnail_label = TitleLabel()
+                thumbnail_pixmap = QPixmap(thumbnail_path).scaled(200, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                thumbnail_label.setPixmap(thumbnail_pixmap)
+                thumbnail_label.setFixedSize(200, 120)
+                card_layout.addWidget(thumbnail_label)
+            else:
+                placeholder = TitleLabel("无缩略图")
+                placeholder.setFixedSize(200, 120)
+                placeholder.setStyleSheet(
+                    "background-color: #f0f0f0; color: #888; border: 1px solid #ddd; border-radius: 4px; text-align: center;")
+                placeholder.setAlignment(Qt.AlignCenter)
+                card_layout.addWidget(placeholder)
+
+            info_label = StrongBodyLabel(snapshot_base_name)
+            info_label.setStyleSheet("font-size: 20px; color: #333;")
+            card_layout.addWidget(info_label, 1)  # 1表示可伸展
+
+            restore_button = PushButton("还原快照")
+            restore_button.setFixedSize(150, 50)
+            restore_button.clicked.connect(
+                lambda _, name=snapshot_base_name: self.restore_snapshot(name))
+            card_layout.addWidget(restore_button)
+            snapshot_list_layout.addWidget(card)
+
+        if not self.snapshots:
+            empty_label = StrongBodyLabel("暂无快照，请点击上方按钮创建快照")
+            empty_label.setAlignment(Qt.AlignCenter)
+            empty_label.setStyleSheet("font-size: 16px; color: #888; margin: 50px;")
+            snapshot_list_layout.addWidget(empty_label)
+        snapshot_list_layout.addStretch(1)
+
+        scroll_area.setWidget(snapshot_list_widget)
+        snapshot_list_widget.setStyleSheet("background: transparent;")
+
+        layout2.addWidget(title_label)
+        layout2.addWidget(save_button)
+        layout.addLayout(layout2)
+        layout.addWidget(scroll_area, 1)
         return page
 
     def packer(self, title):
-
         directories = ["audio", "images", "music"]
         files = ["characters.txt", "character_info.txt", "choice.txt", "story.txt", "dialogues.json"]
 
@@ -409,6 +423,65 @@ class MainWindow(FluentWindow):
                         zipf.write(file_path, os.path.relpath(file_path, os.getcwd()))
             for file in files:
                 zipf.write(file)
+        img = self.find_first_1920x1080_image()
+        self.add_text_to_image(img, title, "snapshot/" + title + ".png")
+
+    def find_first_1920x1080_image(self):
+        for root, _, files in os.walk("images"):
+            for file in files:
+                if file.lower().endswith('.png'):
+                    img_path = os.path.join(root, file)
+                    try:
+                        with Image.open(img_path) as img:
+                            if img.size == (1920, 1080):
+                                return os.path.relpath(img_path)
+                    except Exception:
+                        continue
+        return None
+
+    def add_text_to_image(self, image_path, text, output_path):
+        image = Image.open(image_path).convert("RGBA")
+        draw = ImageDraw.Draw(image)
+
+        font = ImageFont.truetype("SourceHanSansLite.ttf", 150)
+        image_width, image_height = image.size
+        max_width = image_width * 0.8
+        lines = []
+        line = ""
+        for word in text:
+            test_line = line + word
+            text_bbox = draw.textbbox((0, 0), test_line, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            if text_width <= max_width:
+                line = test_line
+            else:
+                lines.append(line)
+                line = word
+        lines.append(line)
+
+        text_heights = [draw.textbbox((0, 0), line, font=font)[3] for line in lines]
+        total_text_height = sum(text_heights) + (len(lines) - 1) * 10
+        y = (image_height - total_text_height) / 2
+        padding = 10
+        bg_x1, bg_y1 = image_width * 0.1, y - padding
+        bg_x2, bg_y2 = image_width * 0.9, y + total_text_height + padding
+        overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+        overlay_draw = ImageDraw.Draw(overlay)
+        overlay_draw.rectangle([bg_x1, bg_y1, bg_x2, bg_y2], fill=(0, 0, 0, 150))
+        image = Image.alpha_composite(image, overlay)
+        draw = ImageDraw.Draw(image)
+        outline_color = "black"
+        for line in lines:
+            text_bbox = draw.textbbox((0, 0), line, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_height = text_bbox[3] - text_bbox[1]
+            x = (image_width - text_width) / 2
+            for dx, dy in [(-2, 0), (2, 0), (0, -2), (0, 2), (-2, -2), (2, 2), (-2, 2), (2, -2)]:
+                draw.text((x + dx, y + dy), line, font=font, fill=outline_color)
+            draw.text((x, y), line, font=font, fill="white")
+            y += text_height + 10  # 10px 行间距
+        image = image.resize((640, 360), Image.LANCZOS)
+        image.convert("RGB").save(output_path)
 
     def get_snapshots(self):
         """获取 snapshot 文件夹中的所有 .zip 文件作为快照"""
@@ -421,14 +494,158 @@ class MainWindow(FluentWindow):
 
     def save_snapshot(self):
         """保存当前页面状态为一个新的快照 zip 文件"""
-        with open("title.txt", "r", encoding="utf-8") as file:
-            title = file.read()
-        snapshot_name = title
-        snapshot_path = os.path.join(self.snapshot_folder, snapshot_name)
+        try:
+            # 确保snapshot文件夹存在
+            if not os.path.exists(self.snapshot_folder):
+                os.makedirs(self.snapshot_folder)
+            try:
+                with open("title.txt", "r", encoding="utf-8") as file:
+                    title = file.read().strip()
+                if not title:  # 如果标题为空
+                    self.error_tips("标题不存在")
+            except FileNotFoundError:
+                self.error_tips("标题不存在")
 
-        self.packer(snapshot_name)
-        self.success_tips(f"保存快照到 {snapshot_path}")
-        self.snapshots = self.get_snapshots()
+            snapshot_name = title
+            snapshot_path = os.path.join(self.snapshot_folder, snapshot_name)
+
+            # 打包快照
+            try:
+                self.packer(snapshot_name)
+                self.success_tips(f"保存快照到 {snapshot_path}")
+            except Exception as e:
+                self.error_tips(f"保存快照失败: {str(e)}")
+                return
+            self.snapshots = self.get_snapshots()
+
+            current_widget = self.stackedWidget.currentWidget()
+            scroll_area = None
+            for child in current_widget.children():
+                if isinstance(child, SingleDirectionScrollArea):
+                    scroll_area = child
+                    break
+
+            if scroll_area:
+                snapshot_list_widget = scroll_area.widget()
+                layout = snapshot_list_widget.layout()
+                scroll_pos = scroll_area.verticalScrollBar().value()
+                while layout.count():
+                    item = layout.takeAt(0)
+                    if item.widget():
+                        item.widget().deleteLater()
+
+                for snapshot_name in self.snapshots:
+                    snapshot_base_name = snapshot_name.removesuffix(".zip")
+
+                    card = CardWidget(snapshot_list_widget)
+                    card_layout = QHBoxLayout(card)
+                    card_layout.setContentsMargins(10, 10, 10, 10)
+
+                    thumbnail_path = f"snapshot/{snapshot_base_name}.png"
+
+                    # 如果缩略图存在，添加到卡片
+                    if os.path.exists(thumbnail_path):
+                        thumbnail_label = TitleLabel()
+                        thumbnail_pixmap = QPixmap(thumbnail_path).scaled(200, 120, Qt.KeepAspectRatio,
+                                                                          Qt.SmoothTransformation)
+                        thumbnail_label.setPixmap(thumbnail_pixmap)
+                        thumbnail_label.setFixedSize(200, 120)
+                        card_layout.addWidget(thumbnail_label)
+                    else:
+                        placeholder = TitleLabel("无缩略图")
+                        placeholder.setFixedSize(200, 120)
+                        placeholder.setStyleSheet(
+                            "background-color: #f0f0f0; color: #888; border: 1px solid #ddd; border-radius: 4px; text-align: center;")
+                        placeholder.setAlignment(Qt.AlignCenter)
+                        card_layout.addWidget(placeholder)
+
+                    info_label = StrongBodyLabel(snapshot_base_name)
+                    info_label.setStyleSheet("font-size: 20px; color: #333;")
+                    card_layout.addWidget(info_label, 1)  # 1表示可伸展
+
+                    restore_button = PushButton("还原快照")
+                    restore_button.setFixedSize(150, 50)
+                    restore_button.clicked.connect(
+                        lambda _, name=snapshot_base_name: self.restore_snapshot(name))
+                    card_layout.addWidget(restore_button)
+                    layout.addWidget(card)
+                if not self.snapshots:
+                    empty_label = StrongBodyLabel("暂无快照，请点击上方按钮创建快照")
+                    empty_label.setAlignment(Qt.AlignCenter)
+                    empty_label.setStyleSheet("font-size: 16px; color: #888; margin: 50px;")
+                    layout.addWidget(empty_label)
+                layout.addStretch(1)
+                QTimer.singleShot(100, lambda: scroll_area.verticalScrollBar().setValue(scroll_pos))
+
+        except Exception as e:
+            self.error_tips(f"保存快照失败: {str(e)}")
+
+    def packer(self, title):
+        """打包当前游戏状态为快照"""
+        try:
+            # 确保目录存在
+            if not os.path.exists(self.snapshot_folder):
+                os.makedirs(self.snapshot_folder)
+
+            directories = ["audio", "images", "music"]
+            files = ["characters.txt", "character_info.txt", "choice.txt", "story.txt", "dialogues.json"]
+
+            # 检查必要的目录是否存在
+            for directory in directories:
+                if not os.path.exists(directory):
+                    os.makedirs(directory)
+
+            # 创建zip文件
+            zip_filename = f"snapshot/{title}.zip"
+            with zipfile.ZipFile(zip_filename, 'w') as zipf:
+                # 添加目录
+                for directory in directories:
+                    if os.path.exists(directory):
+                        for root, dirs, files_in_dir in os.walk(directory):
+                            for file in files_in_dir:
+                                file_path = os.path.join(root, file)
+                                try:
+                                    zipf.write(file_path, os.path.relpath(file_path, os.getcwd()))
+                                except Exception as e:
+                                    self.error_tips(f"添加文件到zip时出错 {file_path}: {e}")
+
+                # 添加文件
+                for file in files:
+                    if os.path.exists(file):
+                        zipf.write(file)
+
+            # 查找并处理图像
+            img_path = self.find_first_1920x1080_image()
+            if img_path:
+                try:
+                    self.add_text_to_image(img_path, title, f"snapshot/{title}.png")
+                except Exception as e:
+                    self.error_tips(f"处理图像时出错: {e}")
+                    self.create_placeholder_image(f"snapshot/{title}.png", title)
+            else:
+                self.create_placeholder_image(f"snapshot/{title}.png", title)
+
+        except Exception as e:
+            self.error_tips(f"打包快照时出错: {e}")
+            raise
+
+    def create_placeholder_image(self, output_path, text):
+        """创建一个简单的占位图像，当找不到合适的背景图时使用"""
+        try:
+            image = Image.new('RGB', (640, 360), color=(100, 100, 100))
+            draw = ImageDraw.Draw(image)
+            try:
+                font = ImageFont.truetype("SourceHanSansLite.ttf", 40)
+            except:
+                font = ImageFont.load_default()
+            text_bbox = draw.textbbox((0, 0), text, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_height = text_bbox[3] - text_bbox[1]
+            position = ((640 - text_width) // 2, (360 - text_height) // 2)
+            draw.text(position, text, font=font, fill=(255, 255, 255))
+            image.save(output_path)
+        except Exception as e:
+            self.error_tips(f"创建占位图像时出错: {e}")
 
     def restore_snapshot(self, snapshot_name):
         """根据压缩包名字还原快照"""
@@ -544,6 +761,7 @@ class MainWindow(FluentWindow):
         draw_key = self.config.get('AI绘画', 'draw_key', fallback='')
         character_id = self.config.get('AI绘画', 'character_id', fallback='')
         background_id = self.config.get('AI绘画', 'background_id', fallback='')
+        comfyui_address = self.config.get('AI绘画', 'comfyui_address', fallback='')
 
         toggle_button = TogglePushButton(FluentIcon.CLOUD, '云端模式')
         toggle_button.setChecked(if_cloud)
@@ -560,6 +778,11 @@ class MainWindow(FluentWindow):
         input_layout = QVBoxLayout()
         input_layout.setSpacing(40)
         input_layout.setContentsMargins(0, 10, 10, 10)
+
+        input_field4 = LineEdit(page)
+        input_field4.setPlaceholderText("comfyui路径")
+        input_field4.setText(comfyui_address)
+        input_field4.setMinimumHeight(40)
 
         input_field1 = PasswordLineEdit(page)
         input_field1.setPlaceholderText("云端绘画的API密钥")
@@ -583,6 +806,7 @@ class MainWindow(FluentWindow):
 
         layout.addWidget(title_label)
         layout.addLayout(switch_layout)
+        input_layout.addWidget(input_field4)
         input_layout.addWidget(input_field1)
         input_layout.addWidget(input_field2)
         input_layout.addWidget(input_field3)
@@ -591,6 +815,7 @@ class MainWindow(FluentWindow):
         input_field1.textChanged.connect(lambda: self.save_config('AI绘画', 'draw_key', input_field1.text()))
         input_field2.textChanged.connect(lambda: self.save_config('AI绘画', 'character_id', input_field2.text()))
         input_field3.textChanged.connect(lambda: self.save_config('AI绘画', 'background_id', input_field3.text()))
+        input_field3.textChanged.connect(lambda: self.save_config('AI绘画', 'comfyui_address', input_field4.text()))
 
         return page
 
@@ -834,11 +1059,11 @@ class MainWindow(FluentWindow):
             text="检查更新",
             icon=FluentIcon.INFO,
             title="关于",
-            content="© 版权所有2025，TamikiP.当前版本1.5"
+            content="© 版权所有2025，TamikiP.当前版本1.6"
         )
         card.clicked.connect(self.on_check_update_clicked)
-        main_layout.addWidget(card)
 
+        main_layout.addWidget(card)
         main_layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
         return options_page
@@ -882,7 +1107,7 @@ class MainWindow(FluentWindow):
         main_layout.addWidget(gpt_sovits_card)
 
         gpt_sovits_model_card = HyperlinkCard(
-            url="https://www.ai-hobbyist.com/forum-121-1.html",
+            url="https://www.ai-hobbyist.com/forum-138-1.html",
             text="下载",
             icon=FluentIcon.CLOUD,
             title="GPT-SOVITS模型资源",
@@ -906,20 +1131,12 @@ class MainWindow(FluentWindow):
 
     def on_auto_update_toggle(self, checked):
         status = "启用" if checked else "禁用"
-        if status == "启用":
-            self.save_config("Settings", "auto_update", "True")
-        else:
-            self.save_config("Settings", "auto_update", "False")
-
+        self.save_config("Settings", "auto_update", "True" if status == "启用" else "False")
         InfoBar.info("自动更新", f"自动更新已{status}", position=InfoBarPosition.TOP_RIGHT, parent=self)
 
     def json_mode(self, checked):
         status = "启用" if checked else "禁用"
-        if status == "启用":
-            self.save_config("Settings", "json_mode", "True")
-        else:
-            self.save_config("Settings", "json_mode", "False")
-
+        self.save_config("Settings", "json_mode", "True" if status == "启用" else "False")
         InfoBar.info("JSON模式", f"JSON模式已{status}", position=InfoBarPosition.TOP_RIGHT, parent=self)
 
     def on_check_update_clicked(self):
@@ -978,12 +1195,10 @@ def updater():
             w.cancelButton.setText("稍后")
             if w.exec():
                 showMessage(window)
-            else:
-                print('取消')
         else:
             return True
     except:
-        print("检查更新失败！")
+        window.error_tips("检查更新失败！")
 
 
 if __name__ == "__main__":

@@ -55,7 +55,7 @@ def online_generate_audio(content, speaker, output_name):
     headers = {
         'Content-Type': 'application/json',
     }
-    online_audio_url_endpoint = 'https://gsv.ai-lab.top/infer_single'
+    online_audio_url_endpoint = 'https://kfj1168euxyju-7860.nm2.spacehpc.com:6443/infer_single'
 
     response = requests.post(online_audio_url_endpoint, data=json.dumps(data), headers=headers)
 
