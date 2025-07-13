@@ -16,6 +16,7 @@ init python:
     config_path = os.path.join(renpy.config.gamedir, "config.toml")
     generator = GameGenerator(config_path)
 
+    # 处理并且整合生成好的分支选项。使其符合renpy的格式
     def list_change(*args, mode="story"):
         original_list = list(args)
         if mode == "story":
@@ -66,6 +67,7 @@ init python:
     last_character_image = ""
 
 image loading movie = Movie(play="gui/custom/loading.webm")
+image warning = "gui/warning.png"
 image bedroom = "talk/bedroom.jpg"
 image sea = "talk/海.jpg"
 image logo = "gui/custom/logo.png"
@@ -118,7 +120,7 @@ label talk_mode:
         scene bedroom
         stop music
         $ renpy.show(character, at_list=[small_center])
-        $ ask = renpy.input("请输入你的对话:")
+        $ ask = renpy.input("请输入你的对话内容:")
         $ response_container = []
         $ info = read(os.path.join(game_directory, "character_info.txt"))
         $ lines = info.splitlines()
@@ -145,24 +147,23 @@ label start:
     if os.path.getsize(os.path.join(game_directory, "story.txt")) == 0:
         $ t = threading.Thread(target=generator.main, daemon=True)
         show sea
-        show load at spin
-        show text "{color=#000000}{size=72}大纲生成中...{/size}{/color}" at my_position
+        "大纲生成中..."
         $ t.start()
         while generator.already_state != "complete":
             if generator.already_state == "story":
-                hide text
-                show text "{color=#000000}{size=72}故事生成中...{/size}{/color}" at my_position
+                "故事生成中..."
             elif generator.already_state == "picture":
-                hide text
-                show text "{color=#000000}{size=72}图像生成中...{/size}{/color}" at my_position
+                "图片生成中..."
             elif generator.already_state == "audio":
-                hide text
-                show text "{color=#000000}{size=72}语音生成中...{/size}{/color}" at my_position
+                "语音生成中..."
             $ renpy.pause(1, hard=True)
         scene black
         stop music
-        "资源加载完成,单击开始游戏"
-        $ renpy.pause(1, hard=True)
+    "资源加载完成,单击开始游戏"
+    $ renpy.pause(1, hard=True)
+    scene warning
+    $ renpy.pause(5, hard=True)
+
 
     stop music
     if os.path.exists(os.path.join(game_directory, "music", "happy bgm.mp3")):
@@ -179,8 +180,6 @@ label start:
             if answer == "user_input":
                 $ answer = renpy.input("请输入你接下来的选择:")
             $ create_thread(answer)
-            show load at spin
-            show text "{color=#000000}{size=72}剧情生成中...{/size}{/color}" at my_position
             $ renpy.pause(0.5, hard=True)
             while generator.generate_new_chapters_state:
                 $ renpy.pause(1, hard=True)

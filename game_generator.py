@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from Prompts import PromptsManager
 from GPT import gpt
 from music_generator import generate_music
-from local_image_generator import generate_image
+from local_image_generator import generate_image, ComfyUI_generate_image
 from cloud_image_generator import online_generate_image
 from local_vocal_generator import generate_audio
 from cloud_vocal_generator import online_generate_audio
@@ -26,7 +26,7 @@ ILLEGAL_CHAR_REPLACEMENTS = {'!': '！', '?': '？', ':': '：', '"': '“', '/'
 
 class GameGenerator:
     def __init__(self, config_path):
-        with open(config_path, 'r') as f:
+        with open(config_path, 'r', encoding="utf-8") as f:
             config = toml.load(f)
         story_config = config.get('剧情', {})
         music_config = config.get('AI音乐', {})
@@ -36,6 +36,7 @@ class GameGenerator:
         # 云端/本地生成开关
         self.if_cloud_image = config.get('AI绘画', {}).get('if_cloud', False)
         self.if_cloud_audio = config.get('SOVITS', {}).get('if_cloud', False)
+        self.if_ComfyUI = config.get('AI绘画', {}).get('if_ComfyUI', False)
         self.prompts_manager = PromptsManager(config_path)
         self.game_directory = os.getcwd()
         self.images_directory = os.path.join(self.game_directory, "images")
@@ -82,7 +83,10 @@ class GameGenerator:
         if self.if_cloud_image:
             online_generate_image(image_prompt, character_name, "character")
         else:
-            generate_image(image_prompt, character_name, "character")
+            if self.if_ComfyUI:
+                ComfyUI_generate_image(image_prompt, character_name, "character")
+            else:
+                generate_image(image_prompt, character_name, "character")
         if character_name not in self.character_list:
             self.character_list.append(character_name)
         with open(os.path.join(self.game_directory, "characters.txt"), "a", encoding='utf-8') as f:
@@ -111,7 +115,10 @@ class GameGenerator:
             if self.if_cloud_image:
                 online_generate_image(background_image_generation_prompt, background_name, "background")
             else:
-                generate_image(background_image_generation_prompt, background_name, "background")
+                if self.if_ComfyUI:
+                    ComfyUI_generate_image(background_image_generation_prompt, background_name, "background")
+                else:
+                    generate_image(background_image_generation_prompt, background_name, "background")
             # 更新全局状态，将此背景设为当前背景
             self.background_list.append(background_name)
             self.current_background_name = background_name
@@ -217,7 +224,12 @@ class GameGenerator:
                             online_generate_image(background_image_generation_prompt, extracted_location_name,
                                                   "background")
                         else:
-                            generate_image(background_image_generation_prompt, extracted_location_name, "background")
+                            if self.if_ComfyUI:
+                                ComfyUI_generate_image(background_image_generation_prompt, extracted_location_name,
+                                                       "background")
+                            else:
+                                generate_image(background_image_generation_prompt, extracted_location_name,
+                                               "background")
                         self.background_list.append(extracted_location_name)
 
                     self.current_background_name = extracted_location_name
@@ -270,13 +282,17 @@ class GameGenerator:
         print("自定义故事处理完成，可退出。")
 
     def main(self):
+        print("程序已开始运行")
         start_time = time.time()
         if self.if_generate_music:
             # 启动音乐生成线程
+            print("启动音乐生成线程")
             music_thread1 = threading.Thread(target=generate_music, args=("common", "happy bgm"))
             music_thread2 = threading.Thread(target=generate_music, args=("sad", "sad bgm"))
             music_thread1.start()
             music_thread2.start()
+        else:
+            print("用户未启动生成音乐模式")
         self._initialize_story_files()
         # 1. GPT生成故事大纲、角色等
         system_msg_initial = self.prompts_manager.get_initial_system_message()
@@ -362,4 +378,4 @@ class GameGenerator:
 
 if __name__ == "__main__":
     generator = GameGenerator("config.toml")
-    generator.custom_story()
+    # generator.custom_story()

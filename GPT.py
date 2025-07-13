@@ -5,8 +5,10 @@ import toml
 import re
 import json
 import os
+
 try:
     import renpy
+
     game_directory = renpy.config.gamedir
 except:
     game_directory = os.getcwd()
@@ -35,7 +37,7 @@ def gpt(system, prompt, json_mode=False):
         payload_dict = {"model": model, "messages": messages, "stream": False}
         if json_mode:
             payload_dict["format"] = "json"
-            
+
         payload = json.dumps(payload_dict)
         headers_local = {'Content-Type': 'application/json'}
         response = requests.post(gpt_url, headers=headers_local, data=payload)
@@ -51,17 +53,20 @@ def gpt(system, prompt, json_mode=False):
         response_format = {'type': 'json_object'}
         if json_mode:
             json_mode = config.get("Settings", "json_mode")
-        payload = json.dumps({"model": model,"temperature": 0.8,**({"response_format": response_format} if json_mode else {}),"messages": messages})
+        payload = json.dumps(
+            {"model": model, "temperature": 0.8, **({"response_format": response_format} if json_mode else {}),
+             "messages": messages})
         headers_remote = {
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {config["CHATGPT"]["gpt_key"]}'
         }
         response = requests.post(gpt_url, headers=headers_remote, data=payload)
         parsed_data = json.loads(response.text)
-        print(parsed_data)
-        content = parsed_data['choices'][0]['message']['content']
+        try:
+            content = parsed_data['choices'][0]['message']['content']
+        except:
+            print("ai文本出现错误:", parsed_data)
     content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
-    print(content)
     match = re.search(r'\{.*\}', content, re.DOTALL)
     content = match.group(0) if match else content
     return content
@@ -71,12 +76,10 @@ def gpt_context(system, prompt, history):
     """上下文模式的GPT对话函数"""
     gpt_url = config.get('CHATGPT', 'BASE_URL')
     model = config.get('CHATGPT', 'model')
-    messages = [{"role": "system", "content": system},{"role": "user", "content": prompt}]
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
     messages = history + messages
     payload = json.dumps({"model": model, "messages": messages})
     response = requests.post(gpt_url, headers=headers, data=payload)
     content = json.loads(response.text)['choices'][0]['message']['content']
     content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
     return content
-
-

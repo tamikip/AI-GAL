@@ -5,7 +5,7 @@ class PromptsManager:
     """管理所有与GPT交互的prompt"""
 
     def __init__(self, config_path):
-        with open(config_path, 'r') as f:
+        with open(config_path, 'r', encoding="utf-8") as f:
             config = toml.load(f)
         self._prompts = config.get('Prompts', {})
 
@@ -52,4 +52,4 @@ class PromptsManager:
     def get_initial_user_template(self):
         """获取初始用户消息prompt模板"""
         return self._prompts.get('initial_user_template',
-                                 "现在请你写一份galgame的标题，大纲，背景，人物,我给出的主题和概要是{theme}，你的输出json格式为:{{'title':'xxxxx','outline':'xxxxx','background':'xxxxx','characters':[{{'name':'xxx','gender':'男','kind':'xxxxx'}},{{'name':'xxx','gender':'女','kind':'xxxxx'}}]}}，kind部分包括角色的外貌和性格特点，人物为5人，一男四女，男主在角色列表中排第一位")
+                                 "现在请你写一份galgame的标题，大纲，背景，人物,我给出的主题和概要是{theme}，你的输出json格式为:{{'title':'xxxxx','outline':'xxxxx','background':'xxxxx','characters':[{{'name':'xxx','gender':'男','kind':'xxxxx'}},{{'name':'xxx','gender':'女','kind':'xxxxx'}}]}}，kind部分包括角色的外貌和性格特点，人物为5人，人物名字不允许带任何标点符号，一男四女，男主在角色列表中排第一位")
