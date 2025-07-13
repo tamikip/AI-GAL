@@ -93,7 +93,7 @@ transform my_position:
 
 label splashscreen:
     scene black
-    play sound "custom/logo.mp3"
+    play sound "gui/custom/logo.mp3"
     show logo with Dissolve(1)
     $ renpy.pause(2)
     hide logo with Dissolve(1)

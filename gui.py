@@ -160,6 +160,7 @@ class MainWindow(FluentWindow):
         folders_to_delete = [
             os.path.join(os.getcwd(), "audio"),
             os.path.join(os.getcwd(), "music"),
+            os.path.join(os.getcwd(), "saves"),
             os.path.join(os.getcwd(), "images"),
             os.path.join(os.getcwd(), "cache")
         ]
