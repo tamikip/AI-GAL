@@ -210,37 +210,6 @@ class MainWindow(FluentWindow):
         else:
             self.error_tips("暂不支持此操作系统")
 
-    def try_run(self):
-        count = 0
-        try:
-            gpt("you are ai", "say 1")
-            count += 1
-        except Exception as e:
-            self.error_tips(f"LLM配置未成功: {e}")
-            print(f"LLM错误详情: {e}")
-            
-        try:
-            response = generate_image("a girl", "test", "character")
-            if response == "error":
-                self.error_tips("AI绘画配置未成功: 返回错误状态")
-            else:
-                count += 1
-        except Exception as e:
-            self.error_tips(f"AI绘画配置未成功: {e}")
-            print(f"AI绘画错误详情: {e}")
-
-        try:
-            response = generate_audio("测试", 1, "character")
-            if response == "error":
-                self.error_tips("AI语音配置未成功: 返回错误状态")
-            else:
-                count += 1
-        except Exception as e:
-            self.error_tips(f"AI语音配置未成功: {e}")
-            print(f"AI语音错误详情: {e}")
-            
-        if count == 3:
-            self.success_tips("测试完毕，所有功能正常")
 
     def create_story_page(self, title):
         page = QWidget()
@@ -860,9 +829,6 @@ class MainWindow(FluentWindow):
         json_mode_card.checkedChanged.connect(self.json_mode)
         layout.addWidget(json_mode_card)
 
-        try_run_card = PushSettingCard("开始", FluentIcon.DOWNLOAD, "试运行", "模拟运行看有没有问题")
-        try_run_card.clicked.connect(self.try_run)
-        layout.addWidget(try_run_card)
 
         doc_card = HyperlinkCard("https://tamikip.github.io/AI-GAL-doc", "查看", FluentIcon.QUICK_NOTE, "使用文档", "不会使用？来看！")
         layout.addWidget(doc_card)
@@ -975,8 +941,8 @@ def updater():
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    setTheme(Theme.DARK)
     window = MainWindow()
+    setTheme(Theme.DARK)
     window.show()
     if auto_update:
         updater()
