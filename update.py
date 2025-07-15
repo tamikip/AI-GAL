@@ -1,5 +1,3 @@
-# 还没改。。。
-import json
 import os
 import requests
 from zipfile import ZipFile
@@ -10,7 +8,7 @@ GITHUB_REPO = "tamikip/AI-GAL"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 DOWNLOAD_DIR = "downloads"
 GAME_DIR = "game"
-CONFIG_FILE = "config.ini"
+CONFIG_FILE = "config.toml"
 
 
 def get_latest_release():
@@ -54,7 +52,7 @@ def update_program():
         if download_file(download_url, download_path):
             with ZipFile(download_path, 'r') as zip_ref:
                 for file in zip_ref.namelist():
-                    if file == os.path.join(filename, "game", "config.ini"):
+                    if file == os.path.join(filename, "game", CONFIG_FILE):
                         continue
                     zip_ref.extract(file, ".")
             shutil.rmtree("downloads")

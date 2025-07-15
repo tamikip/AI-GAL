@@ -1,0 +1,17 @@
+[project]
+name = "game"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pillow>=11.3.0",
+    "requests>=2.32.4",
+    "toml>=0.10.2",
+]
+
+
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple"
+default = true
+index = "aliyun"

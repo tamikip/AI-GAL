@@ -1,5 +1,5 @@
 # 1. 结构更清晰：分离了下载、提交任务、历史查询等功能，易于维护和扩展。
-# 2. 简化功能：仅保留 ComfyUI 支持，去除 SDWebUI、本地抠图等冗余功能。
+# 2. 将comfyui和stablediffusion单独模块化，结构更加清晰。
 # 3. 健壮性提升：增加异常处理，图片命名防止覆盖，流程更易追踪。
 # 4. 代码更简洁：删除无用依赖和复杂流程，便于理解和后续开发。
 # 5. 自动创建图片目录，提升兼容性。
@@ -13,7 +13,6 @@ import base64
 
 try:
     import renpy
-
     game_directory = renpy.config.gamedir
 except:
     game_directory = os.getcwd()
@@ -32,24 +31,107 @@ def rembg(encoded_image):
     }
 
     url = 'http://localhost:7860/rembg'
-    response = requests.post(url, json=data)
-    r = response.json()
-    img_data = r.get('image', None)
-    base64_data = img_data.strip()
-    padding = len(base64_data) % 4
-    if padding != 0:
-        base64_data += '=' * (4 - padding)
-    return base64_data
+    try:
+        response = requests.post(url, json=data)
+        response.raise_for_status()
+        r = response.json()
+        img_data = r.get('image', None)
+        if not img_data:
+            print("rembg failed: no image data in response")
+            return encoded_image
+        base64_data = img_data.strip()
+        padding = len(base64_data) % 4
+        if padding != 0:
+            base64_data += '=' * (4 - padding)
+        return base64_data
+    except requests.exceptions.RequestException as e:
+        print(f"rembg request failed: {e}")
+        return encoded_image # Return original on error
+
+def download_image(url, save_dir=images_directory, filename=None):
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    # 生成文件名（使用时间戳）
+    if filename is None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"image_{timestamp}.png"
+    save_path = os.path.join(save_dir, filename)
+    # 下载图片
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open(save_path, 'wb') as f:
+            f.write(response.content)
+        print(f"图片已保存到: {save_path}")
+        return save_path
+    else:
+        print(f"下载图片失败: {response.status_code}")
+        return None
+
+# 提交工作流到 ComfyUI
+def queue_prompt(prompt_data,ComfyUI_url):
+    payload = {"client_id": "533ef3a3-39c0-4e39-9ced-37c290f378f8","prompt": prompt_data}
+    response = requests.post(f"{ComfyUI_url}/prompt", json=payload)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"提交工作流失败: {response.status_code}")
 
 
-def generate_image(prompt, image_name, mode):
+def get_history(prompt_id, ComfyUI_url):
+    response = requests.get(f"{ComfyUI_url}/history/{prompt_id}")
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"获取任务历史失败: {response.status_code}")
+        return {}
+
+def ComfyUI_generate_image(prompt, image_name, mode):
+    ComfyUI_url = "http://127.0.0.1:8188"
+    if mode == 'background':
+        workflow_path = os.path.join(game_directory, "ComfyUI/gen_background.json")
+    else:
+        workflow_path = os.path.join(game_directory, "ComfyUI/gen_characters.json")
+    
+    with open(workflow_path, "r", encoding="utf-8") as file:
+        prompt_data = json.load(file)
+    if mode == 'background':
+        prompt_data["7"]["inputs"]["seed"] = random.randint(1, 1000000)
+        prompt_data["4"]["inputs"]["text"] += prompt
+    if mode == 'character':
+        prompt_data["3"]["inputs"]["seed"] = random.randint(1, 1000000)
+        prompt_data["57"]["inputs"]["text"] += prompt
+    result = queue_prompt(prompt_data, ComfyUI_url)
+    prompt_id = result.get("prompt_id")
+    if not prompt_id:
+        raise Exception("未获取到 prompt_id")
+    print(f"任务已提交，prompt_id: {prompt_id}")
+
+    while True:
+        history = get_history(prompt_id, ComfyUI_url)
+        if history and prompt_id in history:
+            print("图片下载完成！")
+
+            outputs = history[prompt_id].get('outputs', {})
+            output_node = '12' if mode == 'background' else '64'
+            if outputs and output_node in outputs:
+                images = outputs[output_node].get('images', [])
+                for idx, image in enumerate(images):
+                    image_url = f"{ComfyUI_url}/view?filename={image['filename']}"
+                    fname = f"{image_name}.png" if image_name and idx == 0 else None
+                    download_image(image_url, filename=fname)
+                break
+            else:
+                print("未找到图片输出")
+                break
+        time.sleep(1)
+
+def StableDiffusion_generate_image(prompt, image_name, mode):
     url = "http://localhost:7860"
 
     if mode == 'background':
         width = 960
         height = 540
         prompt2 = "(no_human)"
-
     else:
         width = 512
         height = 768
@@ -74,108 +156,31 @@ def generate_image(prompt, image_name, mode):
 
     try:
         response = requests.post(url=f'{url}/sdapi/v1/txt2img', json=payload)
-        if response.status_code == 200:
-            r = response.json()
-            for i, img_data in enumerate(r['images']):
-                if ',' in img_data:
-                    base64_data = img_data.split(",", 1)[1]
-                else:
-                    base64_data = img_data
-                if mode != "background":
-                    base64_data = rembg(base64_data)
-                image_data = base64.b64decode(base64_data)
-                final_image_name = f'{image_name}.png'
-                with open(fr'{images_directory}\{final_image_name}', 'wb') as f:
-                    f.write(image_data)
-                print(f'图片已保存为 {final_image_name}')
-            return "ok"
-        else:
-            print("Failed to generate image:", response.text)
-            return "error"
-    except:
-        print("绘图失败！")
+        response.raise_for_status()
+        r = response.json()
+        for i, img_data in enumerate(r['images']):
+            if ',' in img_data:
+                base64_data = img_data.split(",", 1)[1]
+            else:
+                base64_data = img_data
+            if mode != "background":
+                base64_data = rembg(base64_data)
+            image_data = base64.b64decode(base64_data)
+            final_image_name = f'{image_name}.png'
+            with open(os.path.join(images_directory, final_image_name), 'wb') as f:
+                f.write(image_data)
+            print(f'图片已保存为 {final_image_name}')
+        return "ok"
+    except requests.exceptions.RequestException as e:
+        print(f"绘图失败！请求错误: {e}")
+        return "error"
+    except Exception as e:
+        print(f"绘图失败！未知错误: {e}")
         return "error"
 
-
-def download_image(url, save_dir=images_directory, filename=None):
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    # 生成文件名（使用时间戳）
-    if filename is None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"image_{timestamp}.png"
-    save_path = os.path.join(save_dir, filename)
-    # 下载图片
-    response = requests.get(url)
-    if response.status_code == 200:
-        with open(save_path, 'wb') as f:
-            f.write(response.content)
-        print(f"图片已保存到: {save_path}")
-        return save_path
+def generate_image(prompt, image_name, mode):
+    use_comfyui = config.get('AI绘画', {}).get('if_ComfyUI', False)
+    if use_comfyui:
+        ComfyUI_generate_image(prompt, image_name, mode)
     else:
-        print(f"下载图片失败: {response.status_code}")
-        return None
-
-
-# 提交工作流到 ComfyUI
-def queue_prompt(prompt_data, ComfyUI_url):
-    payload = {"client_id": "533ef3a3-39c0-4e39-9ced-37c290f378f8", "prompt": prompt_data}
-    response = requests.post(f"{ComfyUI_url}/prompt", json=payload)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        raise Exception(f"提交工作流失败: {response.status_code}")
-
-
-def get_history(prompt_id, ComfyUI_url):
-    response = requests.get(f"{ComfyUI_url}/history/{prompt_id}")
-    if response.status_code == 200:
-        return response.json()
-    else:
-        print(f"获取任务历史失败: {response.status_code}")
-        return {}
-
-
-def ComfyUI_generate_image(prompt, image_name, mode):
-    ComfyUI_url = "http://localhost:8188"
-    if mode == 'background':
-        workflow_path = "ComfyUI/gen_background.json"
-    else:
-        workflow_path = "ComfyUI/gen_characters.json"
-
-    with open(workflow_path, "r", encoding="utf-8") as file:
-        prompt_data = json.load(file)
-    if mode == 'background':
-        prompt_data["7"]["inputs"]["seed"] = random.randint(1, 1000000)
-        prompt_data["4"]["inputs"]["text"] += prompt
-        # print(f"background: {prompt_data['4']['inputs']['text']}")
-    if mode == 'character':
-        prompt_data["3"]["inputs"]["seed"] = random.randint(1, 1000000)
-        prompt_data["57"]["inputs"]["text"] += prompt
-        # print(f"character: {prompt_data['57']['inputs']['text']}")
-    result = queue_prompt(prompt_data, ComfyUI_url)
-    prompt_id = result.get("prompt_id")
-    if not prompt_id:
-        raise Exception("未获取到 prompt_id")
-    print(f"任务已提交，prompt_id: {prompt_id}")
-
-    while True:
-        history = get_history(prompt_id, ComfyUI_url)
-        if history and prompt_id in history:
-            print("图片下载完成！")
-
-            # 获取生成的图片
-            outputs = history[prompt_id].get('outputs', {})
-            output_node = '12' if mode == 'background' else '64'
-            if outputs and output_node in outputs:
-                images = outputs[output_node].get('images', [])
-                for idx, image in enumerate(images):
-                    image_url = f"{ComfyUI_url}/view?filename={image['filename']}"
-                    # 如果提供了 image_name，仅对第一张图片使用，否则用默认命名
-                    fname = f"{image_name}.png" if image_name and idx == 0 else None
-                    download_image(image_url, filename=fname)
-                break
-            else:
-                print("未找到图片输出")
-                break
-        time.sleep(1)
+        StableDiffusion_generate_image(prompt, image_name, mode)

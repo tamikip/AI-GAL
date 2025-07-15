@@ -1,7 +1,7 @@
 # 跨平台路径兼容
 import requests
-import configparser
 import json
+import toml
 import os
 try:
     import renpy
@@ -9,10 +9,9 @@ try:
 except:
     game_directory = os.getcwd()
 
-config = configparser.ConfigParser()
-config_path = os.path.join(game_directory, "config.ini")
-config.read(config_path, encoding='utf-8')
-
+config_path = os.path.join(game_directory, "config.toml")
+with open(config_path, 'r', encoding='utf-8') as f:
+    config = toml.load(f)
 
 def generate_music(prompt, filename):
     music_url = config.get("AI音乐", "base_url")
