@@ -10,6 +10,7 @@ import random
 import time
 from datetime import datetime
 import base64
+import toml
 
 try:
     import renpy
@@ -17,6 +18,10 @@ try:
 except:
     game_directory = os.getcwd()
 images_directory = os.path.join(game_directory, "images")
+
+config_path = os.path.join(game_directory, "config.toml")
+with open(config_path, 'r', encoding="utf-8") as f:
+    config = toml.load(f)
 
 
 def rembg(encoded_image):
@@ -46,7 +51,8 @@ def rembg(encoded_image):
         return base64_data
     except requests.exceptions.RequestException as e:
         print(f"rembg request failed: {e}")
-        return encoded_image # Return original on error
+        return encoded_image  # Return original on error
+
 
 def download_image(url, save_dir=images_directory, filename=None):
     if not os.path.exists(save_dir):
@@ -67,9 +73,10 @@ def download_image(url, save_dir=images_directory, filename=None):
         print(f"下载图片失败: {response.status_code}")
         return None
 
+
 # 提交工作流到 ComfyUI
-def queue_prompt(prompt_data,ComfyUI_url):
-    payload = {"client_id": "533ef3a3-39c0-4e39-9ced-37c290f378f8","prompt": prompt_data}
+def queue_prompt(prompt_data, ComfyUI_url):
+    payload = {"client_id": "533ef3a3-39c0-4e39-9ced-37c290f378f8", "prompt": prompt_data}
     response = requests.post(f"{ComfyUI_url}/prompt", json=payload)
     if response.status_code == 200:
         return response.json()
@@ -85,13 +92,14 @@ def get_history(prompt_id, ComfyUI_url):
         print(f"获取任务历史失败: {response.status_code}")
         return {}
 
+
 def ComfyUI_generate_image(prompt, image_name, mode):
     ComfyUI_url = "http://127.0.0.1:8188"
     if mode == 'background':
         workflow_path = os.path.join(game_directory, "ComfyUI/gen_background.json")
     else:
         workflow_path = os.path.join(game_directory, "ComfyUI/gen_characters.json")
-    
+
     with open(workflow_path, "r", encoding="utf-8") as file:
         prompt_data = json.load(file)
     if mode == 'background':
@@ -124,6 +132,7 @@ def ComfyUI_generate_image(prompt, image_name, mode):
                 print("未找到图片输出")
                 break
         time.sleep(1)
+
 
 def StableDiffusion_generate_image(prompt, image_name, mode):
     url = "http://localhost:7860"
@@ -177,6 +186,7 @@ def StableDiffusion_generate_image(prompt, image_name, mode):
     except Exception as e:
         print(f"绘图失败！未知错误: {e}")
         return "error"
+
 
 def generate_image(prompt, image_name, mode):
     use_comfyui = config.get('AI绘画', {}).get('if_ComfyUI', False)
