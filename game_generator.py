@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from Prompts import PromptsManager
 from GPT import gpt
 from music_generator import generate_music
-from local_image_generator import generate_image, ComfyUI_generate_image
+from local_image_generator import generate_image
 from cloud_image_generator import online_generate_image
 from local_vocal_generator import generate_audio
 from cloud_vocal_generator import online_generate_audio
@@ -36,7 +36,6 @@ class GameGenerator:
         # 云端/本地生成开关
         self.if_cloud_image = config.get('AI绘画', {}).get('if_cloud', False)
         self.if_cloud_audio = config.get('SOVITS', {}).get('if_cloud', False)
-        self.if_ComfyUI = config.get('AI绘画', {}).get('if_ComfyUI', False)
         self.prompts_manager = PromptsManager(config_path)
         self.game_directory = os.getcwd()
         self.images_directory = os.path.join(self.game_directory, "images")
@@ -83,10 +82,7 @@ class GameGenerator:
         if self.if_cloud_image:
             online_generate_image(image_prompt, character_name, "character")
         else:
-            if self.if_ComfyUI:
-                ComfyUI_generate_image(image_prompt, character_name, "character")
-            else:
-                generate_image(image_prompt, character_name, "character")
+            generate_image(image_prompt, character_name, "character")
         if character_name not in self.character_list:
             self.character_list.append(character_name)
         with open(os.path.join(self.game_directory, "characters.txt"), "a", encoding='utf-8') as f:
@@ -115,10 +111,7 @@ class GameGenerator:
             if self.if_cloud_image:
                 online_generate_image(background_image_generation_prompt, background_name, "background")
             else:
-                if self.if_ComfyUI:
-                    ComfyUI_generate_image(background_image_generation_prompt, background_name, "background")
-                else:
-                    generate_image(background_image_generation_prompt, background_name, "background")
+                generate_image(background_image_generation_prompt, background_name, "background")
             # 更新全局状态，将此背景设为当前背景
             self.background_list.append(background_name)
             self.current_background_name = background_name
@@ -224,12 +217,7 @@ class GameGenerator:
                             online_generate_image(background_image_generation_prompt, extracted_location_name,
                                                   "background")
                         else:
-                            if self.if_ComfyUI:
-                                ComfyUI_generate_image(background_image_generation_prompt, extracted_location_name,
-                                                       "background")
-                            else:
-                                generate_image(background_image_generation_prompt, extracted_location_name,
-                                               "background")
+                            generate_image(background_image_generation_prompt, extracted_location_name, "background")
                         self.background_list.append(extracted_location_name)
 
                     self.current_background_name = extracted_location_name
@@ -378,4 +366,4 @@ class GameGenerator:
 
 if __name__ == "__main__":
     generator = GameGenerator("config.toml")
-    # generator.custom_story()
+    generator.custom_story()
