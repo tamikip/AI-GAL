@@ -11,8 +11,8 @@ from urllib.parse import urlparse, parse_qs
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer, Qt, QSize
 from PyQt5.QtGui import QIcon, QTextCursor, QPixmap
-from PyQt5.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget, QSpacerItem, QSizePolicy, QGridLayout
-from qfluentwidgets import (NavigationItemPosition, LineEdit, TitleLabel, TogglePushButton, TransparentToolButton, ComboBox, PushButton, FluentIcon, Theme, setTheme, InfoBar, InfoBarPosition, HyperlinkCard, HorizontalFlipView, PrimaryPushButton, StrongBodyLabel, HyperlinkButton, PasswordLineEdit, FluentWindow, Dialog, IndeterminateProgressBar, MessageBoxBase, SubtitleLabel, SwitchSettingCard, TextEdit, ProgressBar, PushSettingCard, PrimaryPushSettingCard, SingleDirectionScrollArea, CardWidget, theme)
+from PyQt5.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget,  QSizePolicy, QGridLayout
+from qfluentwidgets import (NavigationItemPosition, LineEdit, TitleLabel, TogglePushButton, TransparentToolButton, ComboBox, PushButton, FluentIcon, Theme, setTheme, InfoBar, InfoBarPosition, HyperlinkCard, HorizontalFlipView, PrimaryPushButton, StrongBodyLabel, HyperlinkButton, PasswordLineEdit, FluentWindow, Dialog, IndeterminateProgressBar, MessageBoxBase, SubtitleLabel, SwitchSettingCard, TextEdit, PrimaryPushSettingCard, SingleDirectionScrollArea, CardWidget, theme)
 import update
 import subprocess
 from GPT import gpt
@@ -549,6 +549,20 @@ class MainWindow(FluentWindow):
         model_name = chatgpt_config.get('model', '')
         api_key = chatgpt_config.get('gpt_key', '')
         proxy = chatgpt_config.get('proxy', '')
+        model_supplier = chatgpt_config.get('ModelSupplier', 'OpenAI')
+
+        # 模型供应商列表
+        supplier_layout = QHBoxLayout()
+        supplier_label = StrongBodyLabel("模型供应商:", page)
+        supplier_combo = ComboBox()
+        suppliers = ['OpenAI', 'GoogleAIstudio', 'Ollama']
+        supplier_combo.addItems(suppliers)
+        if model_supplier in suppliers:
+            supplier_combo.setCurrentIndex(suppliers.index(model_supplier))
+        
+        supplier_layout.addWidget(supplier_label)
+        supplier_layout.addWidget(supplier_combo)
+        supplier_layout.setContentsMargins(10, 10, 10, 20)
 
         input_field1 = LineEdit(page)
         input_field1.setPlaceholderText("请输入LLM的转发URL")
@@ -574,7 +588,27 @@ class MainWindow(FluentWindow):
             input_layout.addWidget(widget)
 
         layout.addWidget(title_label)
+        layout.addLayout(supplier_layout)
         layout.addLayout(input_layout)
+
+        def update_visibility(index):
+            supplier = suppliers[index]
+            if supplier == 'OpenAI':
+                input_field1.show()
+                input_field3.show()
+                input_field4.show()
+            elif supplier == 'GoogleAIstudio':
+                input_field1.hide()
+                input_field3.show()
+                input_field4.show()
+            elif supplier == 'Ollama':
+                input_field1.hide()
+                input_field3.hide()
+                input_field4.hide()
+            self.save_config('CHATGPT', 'ModelSupplier', supplier)
+
+        supplier_combo.currentIndexChanged.connect(update_visibility)
+        update_visibility(supplier_combo.currentIndex())
 
         input_field1.textChanged.connect(lambda text: self.save_config('CHATGPT', 'base_url', text))
         input_field2.textChanged.connect(lambda text: self.save_config('CHATGPT', 'model', text))
