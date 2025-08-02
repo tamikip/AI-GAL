@@ -7,7 +7,7 @@ import os
 import shutil
 import sys
 import webbrowser
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, urlencode
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer, Qt, QSize
 from PyQt5.QtGui import QIcon, QTextCursor, QPixmap
@@ -15,9 +15,6 @@ from PyQt5.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QHBoxLayout,
 from qfluentwidgets import (NavigationItemPosition, LineEdit, TitleLabel, TogglePushButton, TransparentToolButton, ComboBox, PushButton, FluentIcon, Theme, setTheme, InfoBar, InfoBarPosition, HyperlinkCard, HorizontalFlipView, PrimaryPushButton, StrongBodyLabel, HyperlinkButton, PasswordLineEdit, FluentWindow, Dialog, IndeterminateProgressBar, MessageBoxBase, SubtitleLabel, SwitchSettingCard, TextEdit, PrimaryPushSettingCard, SingleDirectionScrollArea, CardWidget, theme)
 import update
 import subprocess
-from GPT import gpt
-from local_image_generator import generate_image
-from local_vocal_generator import generate_audio
 import zipfile
 import toml
 
@@ -697,27 +694,21 @@ class MainWindow(FluentWindow):
         title_label = TitleLabel(f"{title} 页面", page)
         title_label.setStyleSheet("font-size: 24px; margin: 10px;")
 
+        # --- 读取整个 SOVITS 配置区 ---
+        # 使用 .get('SOVITS', {}) 确保即使该部分不存在也不会报错
         sovits_config = self.config.get('SOVITS', {})
         if_cloud = sovits_config.get('if_cloud', False)
-        api_key = sovits_config.get('语音key', '')
-        version = sovits_config.get('version', 0)
+        api_key = sovits_config.get('api_key', '') # 统一使用 api_key
 
+        # --- 顶部控件 ---
         toggle_button = TogglePushButton('云端模式', self, FluentIcon.CLOUD)
         toggle_button.setChecked(if_cloud)
         toggle_button.toggled.connect(lambda checked: self.save_config('SOVITS', 'if_cloud', checked))
 
-        comboBox = ComboBox()
-        items = ['V1', 'V2']
-        comboBox.addItems(items)
-        comboBox.setCurrentIndex(version)
-        comboBox.currentIndexChanged.connect(lambda index: self.save_config('SOVITS', 'version', index))
-
         help_button = HyperlinkButton(FluentIcon.HELP, "https://tamikip.github.io/AI-GAL-doc/", "帮助")
 
         header_layout = QHBoxLayout()
-        header_layout.setAlignment(Qt.AlignLeft)
         header_layout.addWidget(toggle_button)
-        header_layout.addWidget(comboBox)
         header_layout.addStretch(1)
         header_layout.addWidget(help_button)
 
@@ -725,36 +716,57 @@ class MainWindow(FluentWindow):
         api_key_input.setPlaceholderText("云端语音API密钥")
         api_key_input.setText(api_key)
         api_key_input.setMinimumHeight(40)
-        api_key_input.textChanged.connect(lambda text: self.save_config('SOVITS', '语音key', text))
+        api_key_input.textChanged.connect(lambda text: self.save_config('SOVITS', 'api_key', text))
 
         layout.addWidget(title_label)
         layout.addLayout(header_layout)
         layout.addWidget(api_key_input)
 
+        # --- 动态模型输入区 ---
         input_layout = QVBoxLayout()
-        input_layout.setSpacing(20)
+        input_layout.setSpacing(15)
         input_layout.setContentsMargins(0, 10, 0, 10)
 
+        # 直接读取 models 列表，如果不存在则为空列表
+        models = sovits_config.get('models', [])
         placeholders = ["男主", "女主1", "女主2", "女主3", "女主4", "女主5"]
-        for i in range(6):
-            h_layout = QHBoxLayout()
-            model_key = f'model{i + 1}'
-            url_key = f'sovits_url{i + 1}'
-            
-            model_name = sovits_config.get(model_key, '')
-            url = sovits_config.get(url_key, '')
 
-            parsed_url = urlparse(url)
+        # 辅助函数：解析URL参数
+        def get_url_param(url, param_name):
+            try:
+                return parse_qs(urlparse(url).query).get(param_name, [''])[0]
+            except (AttributeError, IndexError):
+                return ''
+
+        # 辅助函数：更新URL参数并返回新URL
+        def update_url_param(original_url, param_name, new_value):
+            parsed_url = urlparse(original_url or 'http://127.0.0.1:9880/tts?')
             query_params = parse_qs(parsed_url.query)
-            ref_audio = query_params.get("refer_audio_path", [''])[0]
-            prompt_text = query_params.get("prompt_text", [''])[0]
+            query_params[param_name] = [new_value]
+            # 确保 prompt_language 存在
+            if 'prompt_language' not in query_params:
+                query_params['prompt_language'] = ['zh']
+            new_query = urlencode(query_params, doseq=True)
+            return parsed_url._replace(query=new_query).geturl()
 
+        # 遍历模型列表来创建输入行
+        for i, model_data in enumerate(models):
+            h_layout = QHBoxLayout()
+            
+            model_name = model_data.get('name', '')
+            url = model_data.get('url', '')
+            
+            ref_audio = get_url_param(url, 'ref_audio_path')
+            prompt_text = get_url_param(url, 'prompt_text')
+            
+            # --- 创建控件 ---
             ref_audio_input = LineEdit(page)
-            ref_audio_input.setPlaceholderText(f"{placeholders[i]}参考音频")
+            ref_audio_input.setPlaceholderText(f"{placeholders[i]} 参考音频")
             ref_audio_input.setText(ref_audio)
             ref_audio_input.setReadOnly(True)
-            
+
             file_button = TransparentToolButton(FluentIcon.FOLDER_ADD)
+            # 使用 lambda 默认参数 le=ref_audio_input 捕获正确的输入框实例
             file_button.clicked.connect(lambda _, le=ref_audio_input: self.openFileDialog(le, "音频文件 (*.mp3 *.wav)"))
 
             prompt_input = LineEdit(page)
@@ -765,17 +777,26 @@ class MainWindow(FluentWindow):
             model_input.setPlaceholderText("模型名称(本地)")
             model_input.setText(model_name)
 
-            for widget in [ref_audio_input, prompt_input, model_input]:
+            for widget in [ref_audio_input, prompt_input, model_input, file_button]:
                 widget.setMinimumHeight(40)
 
-            def on_text_changed(le_ref, le_prompt, le_model, url_k, model_k):
-                new_url = f"http://127.0.0.1:9880/tts?refer_audio_path={le_ref.text()}&prompt_text={le_prompt.text()}&prompt_language=zh"
-                self.save_config('SOVITS', url_k, new_url)
-                self.save_config('SOVITS', model_k, le_model.text())
+            # 使用 lambda 默认参数 i=i 来捕获循环索引
+            def save_and_update_config():
+                # 每次修改后，将整个更新后的 models 列表保存回去
+                self.save_config('SOVITS', 'models', models)
 
-            ref_audio_input.textChanged.connect(lambda: on_text_changed(ref_audio_input, prompt_input, model_input, url_key, model_key))
-            prompt_input.textChanged.connect(lambda: on_text_changed(ref_audio_input, prompt_input, model_input, url_key, model_key))
-            model_input.textChanged.connect(lambda: on_text_changed(ref_audio_input, prompt_input, model_input, url_key, model_key))
+            ref_audio_input.textChanged.connect(lambda text, i=i: [
+                models[i].update({'url': update_url_param(models[i].get('url'), 'ref_audio_path', text)}),
+                save_and_update_config()
+            ])
+            prompt_input.textChanged.connect(lambda text, i=i: [
+                models[i].update({'url': update_url_param(models[i].get('url'), 'prompt_text', text)}),
+                save_and_update_config()
+            ])
+            model_input.textChanged.connect(lambda text, i=i: [
+                models[i].update({'name': text}),
+                save_and_update_config()
+            ])
 
             h_layout.addWidget(ref_audio_input, 2)
             h_layout.addWidget(file_button)
