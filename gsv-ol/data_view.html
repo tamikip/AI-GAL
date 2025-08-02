@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>语音数据查看器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            color: #334155;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #64748b;
+            font-size: 1rem;
+        }
+
+        .file-upload {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+            text-align: center;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-input-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #3b82f6;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .file-input-btn:hover {
+            background: #2563eb;
+        }
+
+        .file-info {
+            margin-top: 12px;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .controls {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+        }
+
+        .search-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr auto;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .search-input {
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .filter-select {
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            min-width: 120px;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .clear-btn {
+            padding: 12px 20px;
+            background: #f1f5f9;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #475569;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .clear-btn:hover {
+            background: #e2e8f0;
+        }
+
+        .stats {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            font-size: 14px;
+        }
+
+        .stat-number {
+            font-weight: 600;
+            color: #3b82f6;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th {
+            background: #f8fafc;
+            padding: 16px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            color: #475569;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .data-table td {
+            padding: 16px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: top;
+        }
+
+        .data-table tr:hover {
+            background: #f8fafc;
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .voice-name {
+            font-weight: 500;
+            color: #1e293b;
+            max-width: 350px;
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+
+        .voice-id {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            color: #64748b;
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .tag {
+            display: inline-block;
+            background: #eff6ff;
+            color: #1d4ed8;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            margin: 2px 4px 2px 0;
+            border: 1px solid #dbeafe;
+        }
+
+        .language {
+            background: #f0fdf4;
+            color: #166534;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            border: 1px solid #dcfce7;
+        }
+
+        .gender {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .gender.female {
+            background: #fdf2f8;
+            color: #be185d;
+            border: 1px solid #fce7f3;
+        }
+
+        .gender.male {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #dbeafe;
+        }
+
+        .error {
+            text-align: center;
+            padding: 40px 20px;
+            color: #dc2626;
+            background: #fef2f2;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #fecaca;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+
+        .no-data h3 {
+            margin-bottom: 8px;
+            color: #475569;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+
+        .no-results h3 {
+            margin-bottom: 8px;
+            color: #475569;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .pagination-info {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .page-size-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .page-size-select {
+            padding: 6px 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .pagination-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .page-btn {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #475569;
+            transition: all 0.2s;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            background: #f8fafc;
+            border-color: #3b82f6;
+        }
+
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .page-btn.active {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+
+        .page-input-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .page-input {
+            width: 60px;
+            padding: 6px 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .page-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 16px;
+            }
+            
+            .search-row {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            
+            .stats {
+                justify-content: center;
+            }
+            
+            .data-table {
+                font-size: 13px;
+            }
+            
+            .data-table th,
+            .data-table td {
+                padding: 12px 8px;
+            }
+            
+            .voice-name {
+                max-width: 200px;
+            }
+            
+            .pagination {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+            
+            .pagination-controls {
+                justify-content: center;
+            }
+            
+            .pagination-nav {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            
+            .page-input-group {
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .data-table th,
+            .data-table td {
+                padding: 8px 6px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>语音数据查看器</h1>
+            <p>上传JSON文件来浏览和搜索语音角色数据</p>
+        </div>
+
+        <div class="file-upload">
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" class="file-input" accept=".json" />
+                <label for="fileInput" class="file-input-btn">选择JSON文件</label>
+            </div>
+            <div class="file-info" id="fileInfo">请选择包含语音数据的JSON文件</div>
+        </div>
+
+        <div class="controls" id="controls" style="display: none;">
+            <div class="search-row">
+                <input type="text" id="searchInput" class="search-input" placeholder="搜索语音名称或ID...">
+                
+                <select id="tagFilter" class="filter-select">
+                    <option value="">所有标签</option>
+                </select>
+                
+                <select id="languageFilter" class="filter-select">
+                    <option value="">所有语言</option>
+                </select>
+                
+                <select id="genderFilter" class="filter-select">
+                    <option value="">所有性别</option>
+                    <option value="female">女性</option>
+                    <option value="male">男性</option>
+                </select>
+                
+                <button id="clearBtn" class="clear-btn">清空筛选</button>
+            </div>
+        </div>
+
+        <div class="stats" id="stats" style="display: none;">
+            <div class="stat-item">
+                总数据: <span class="stat-number" id="totalCount">0</span>
+            </div>
+            <div class="stat-item">
+                显示: <span class="stat-number" id="visibleCount">0</span>
+            </div>
+            <div class="stat-item">
+                女性: <span class="stat-number" id="femaleCount">0</span>
+            </div>
+            <div class="stat-item">
+                男性: <span class="stat-number" id="maleCount">0</span>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div id="error" class="error" style="display: none;">
+                <h3>文件解析失败</h3>
+                <p id="errorMessage">请确保上传的是有效的JSON文件</p>
+            </div>
+
+            <div id="noData" class="no-data">
+                <h3>暂无数据</h3>
+                <p>请上传JSON文件来查看语音数据</p>
+            </div>
+
+            <table id="dataTable" class="data-table" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>语音名称</th>
+                        <th>标签</th>
+                        <th>语言</th>
+                        <th>性别</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+
+            <div class="pagination" id="pagination" style="display: none;">
+                <div class="pagination-info" id="paginationInfo">
+                    显示 1-10 条，共 100 条数据
+                </div>
+                
+                <div class="pagination-controls">
+                    <div class="page-size-selector">
+                        <span>每页显示:</span>
+                        <select id="pageSizeSelect" class="page-size-select">
+                            <option value="10">10</option>
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    
+                    <div class="pagination-nav">
+                        <button id="firstPageBtn" class="page-btn">首页</button>
+                        <button id="prevPageBtn" class="page-btn">上一页</button>
+                        
+                        <div id="pageNumbers" class="pagination-nav">
+                            <!-- 页码按钮将动态生成 -->
+                        </div>
+                        
+                        <button id="nextPageBtn" class="page-btn">下一页</button>
+                        <button id="lastPageBtn" class="page-btn">末页</button>
+                    </div>
+                    
+                    <div class="page-input-group">
+                        <span>跳转到:</span>
+                        <input type="number" id="pageInput" class="page-input" min="1" placeholder="1">
+                        <button id="goPageBtn" class="page-btn">确定</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="noResults" class="no-results" style="display: none;">
+                <h3>未找到匹配结果</h3>
+                <p>请尝试调整搜索条件</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allData = [];
+        let filteredData = [];
+        let allTags = new Set();
+        let allLanguages = new Set();
+
+        // 分页相关变量
+        let currentPage = 1;
+        let pageSize = 25;
+        let totalPages = 1;
+
+        // 文件上传处理
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const fileInfo = document.getElementById('fileInfo');
+                fileInfo.textContent = `已选择: ${file.name}`;
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const jsonData = JSON.parse(e.target.result);
+                        loadDataFromJson(jsonData);
+                    } catch (error) {
+                        showError('JSON文件格式错误: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // 从JSON数据加载
+        function loadDataFromJson(jsonData) {
+            try {
+                // 支持两种格式：直接数组或包含data字段的对象
+                let data;
+                if (Array.isArray(jsonData)) {
+                    data = jsonData;
+                } else if (jsonData.data && Array.isArray(jsonData.data)) {
+                    data = jsonData.data;
+                } else {
+                    throw new Error('JSON格式不正确，需要包含数据数组');
+                }
+
+                allData = data;
+                filteredData = [...allData];
+                currentPage = 1; // 重置页码
+                
+                // 提取所有标签和语言
+                extractFilters();
+                populateFilters();
+                
+                // 初始化事件监听器
+                initEventListeners();
+                
+                renderTable();
+                updateStats();
+                
+                // 显示控件和统计信息
+                document.getElementById('controls').style.display = 'block';
+                document.getElementById('stats').style.display = 'flex';
+                document.getElementById('noData').style.display = 'none';
+                document.getElementById('error').style.display = 'none';
+                document.getElementById('dataTable').style.display = 'table';
+                
+            } catch (error) {
+                showError('数据处理失败: ' + error.message);
+            }
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('noData').style.display = 'none';
+            document.getElementById('dataTable').style.display = 'none';
+            document.getElementById('controls').style.display = 'none';
+            document.getElementById('stats').style.display = 'none';
+            document.getElementById('pagination').style.display = 'none';
+        }
+
+        // 提取所有标签和语言
+        function extractFilters() {
+            allTags.clear();
+            allLanguages.clear();
+            
+            allData.forEach(item => {
+                // 提取标签
+                if (item.tags && Array.isArray(item.tags)) {
+                    item.tags.forEach(tag => {
+                        if (tag.tag_name) {
+                            allTags.add(tag.tag_name);
+                        }
+                    });
+                }
+                
+                // 提取语言
+                if (item.language) {
+                    allLanguages.add(item.language);
+                }
+            });
+        }
+
+        // 填充筛选器选项
+        function populateFilters() {
+            // 填充标签筛选器
+            const tagFilter = document.getElementById('tagFilter');
+            const sortedTags = Array.from(allTags).sort();
+            
+            tagFilter.innerHTML = '<option value="">所有标签</option>';
+            sortedTags.forEach(tag => {
+                const option = document.createElement('option');
+                option.value = tag;
+                option.textContent = tag;
+                tagFilter.appendChild(option);
+            });
+
+            // 填充语言筛选器
+            const languageFilter = document.getElementById('languageFilter');
+            const sortedLanguages = Array.from(allLanguages).sort();
+            
+            languageFilter.innerHTML = '<option value="">所有语言</option>';
+            sortedLanguages.forEach(language => {
+                const option = document.createElement('option');
+                option.value = language;
+                option.textContent = language;
+                languageFilter.appendChild(option);
+            });
+        }
+
+        // 初始化事件监听器
+        function initEventListeners() {
+            // 搜索和筛选事件
+            document.getElementById('searchInput').addEventListener('input', filterData);
+            document.getElementById('tagFilter').addEventListener('change', filterData);
+            document.getElementById('languageFilter').addEventListener('change', filterData);
+            document.getElementById('genderFilter').addEventListener('change', filterData);
+            document.getElementById('clearBtn').addEventListener('click', clearFilters);
+
+            // 分页事件
+            document.getElementById('pageSizeSelect').addEventListener('change', (e) => {
+                changePageSize(e.target.value);
+            });
+
+            document.getElementById('firstPageBtn').addEventListener('click', () => {
+                goToPage(1);
+            });
+
+            document.getElementById('prevPageBtn').addEventListener('click', () => {
+                goToPage(currentPage - 1);
+            });
+
+            document.getElementById('nextPageBtn').addEventListener('click', () => {
+                goToPage(currentPage + 1);
+            });
+
+            document.getElementById('lastPageBtn').addEventListener('click', () => {
+                goToPage(totalPages);
+            });
+
+            document.getElementById('goPageBtn').addEventListener('click', () => {
+                const pageInput = document.getElementById('pageInput');
+                const targetPage = parseInt(pageInput.value);
+                if (targetPage) {
+                    goToPage(targetPage);
+                    pageInput.value = '';
+                }
+            });
+
+            document.getElementById('pageInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    document.getElementById('goPageBtn').click();
+                }
+            });
+        }
+
+        // 渲染表格
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            const noResults = document.getElementById('noResults');
+            const pagination = document.getElementById('pagination');
+            
+            if (filteredData.length === 0) {
+                tbody.innerHTML = '';
+                noResults.style.display = 'block';
+                pagination.style.display = 'none';
+                return;
+            }
+            
+            noResults.style.display = 'none';
+            
+            // 计算分页
+            totalPages = Math.ceil(filteredData.length / pageSize);
+            currentPage = Math.min(currentPage, Math.max(1, totalPages)); // 确保当前页在有效范围内
+            
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = Math.min(startIndex + pageSize, filteredData.length);
+            const currentPageData = filteredData.slice(startIndex, endIndex);
+            
+            // 渲染当前页数据
+            tbody.innerHTML = currentPageData.map(item => {
+                const tags = item.tags ? item.tags.map(tag => 
+                    `<span class="tag">${tag.tag_name}</span>`
+                ).join('') : '';
+                
+                return `
+                    <tr>
+                        <td><span class="voice-id">${item.id || '未知'}</span></td>
+                        <td class="voice-name">${item.voice_name || '未知'}</td>
+                        <td>${tags}</td>
+                        <td><span class="language">${item.language || '未知'}</span></td>
+                        <td><span class="gender ${item.gender}">${item.gender === 'female' ? '女性' : item.gender === 'male' ? '男性' : '未知'}</span></td>
+                    </tr>
+                `;
+            }).join('');
+            
+            // 显示分页控件
+            if (totalPages > 1) {
+                pagination.style.display = 'flex';
+                updatePaginationInfo();
+                updatePaginationControls();
+            } else {
+                pagination.style.display = 'none';
+            }
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            const totalCount = allData.length;
+            const visibleCount = filteredData.length;
+            const femaleCount = allData.filter(item => item.gender === 'female').length;
+            const maleCount = allData.filter(item => item.gender === 'male').length;
+            
+            document.getElementById('totalCount').textContent = totalCount;
+            document.getElementById('visibleCount').textContent = visibleCount;
+            document.getElementById('femaleCount').textContent = femaleCount;
+            document.getElementById('maleCount').textContent = maleCount;
+        }
+
+        // 筛选数据
+        function filterData() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const selectedTag = document.getElementById('tagFilter').value;
+            const selectedLanguage = document.getElementById('languageFilter').value;
+            const selectedGender = document.getElementById('genderFilter').value;
+            
+            filteredData = allData.filter(item => {
+                // 搜索条件
+                const matchesSearch = !searchTerm || 
+                    (item.voice_name && item.voice_name.toLowerCase().includes(searchTerm)) ||
+                    (item.id && item.id.toString().includes(searchTerm));
+                
+                // 标签筛选
+                const matchesTag = !selectedTag || 
+                    (item.tags && item.tags.some(tag => tag.tag_name === selectedTag));
+                
+                // 语言筛选
+                const matchesLanguage = !selectedLanguage || item.language === selectedLanguage;
+                
+                // 性别筛选
+                const matchesGender = !selectedGender || item.gender === selectedGender;
+                
+                return matchesSearch && matchesTag && matchesLanguage && matchesGender;
+            });
+            
+            currentPage = 1; // 筛选后重置到第一页
+            renderTable();
+            
+            // 更新可见数量统计
+            document.getElementById('visibleCount').textContent = filteredData.length;
+        }
+
+        // 清空所有筛选
+        function clearFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('tagFilter').value = '';
+            document.getElementById('languageFilter').value = '';
+            document.getElementById('genderFilter').value = '';
+            filterData();
+        }
+
+        // 更新分页信息
+        function updatePaginationInfo() {
+            const startIndex = (currentPage - 1) * pageSize + 1;
+            const endIndex = Math.min(currentPage * pageSize, filteredData.length);
+            const paginationInfo = document.getElementById('paginationInfo');
+            
+            paginationInfo.textContent = `显示 ${startIndex}-${endIndex} 条，共 ${filteredData.length} 条数据`;
+        }
+
+        // 更新分页控件
+        function updatePaginationControls() {
+            const firstPageBtn = document.getElementById('firstPageBtn');
+            const prevPageBtn = document.getElementById('prevPageBtn');
+            const nextPageBtn = document.getElementById('nextPageBtn');
+            const lastPageBtn = document.getElementById('lastPageBtn');
+            const pageInput = document.getElementById('pageInput');
+            
+            // 更新按钮状态
+            firstPageBtn.disabled = currentPage === 1;
+            prevPageBtn.disabled = currentPage === 1;
+            nextPageBtn.disabled = currentPage === totalPages;
+            lastPageBtn.disabled = currentPage === totalPages;
+            
+            // 更新页码输入框
+            pageInput.max = totalPages;
+            pageInput.placeholder = currentPage.toString();
+            
+            // 生成页码按钮
+            generatePageNumbers();
+        }
+
+        // 生成页码按钮
+        function generatePageNumbers() {
+            const pageNumbers = document.getElementById('pageNumbers');
+            pageNumbers.innerHTML = '';
+            
+            // 计算显示的页码范围
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, currentPage + 2);
+            
+            // 确保显示5个页码（如果可能）
+            if (endPage - startPage < 4) {
+                if (startPage === 1) {
+                    endPage = Math.min(totalPages, startPage + 4);
+                } else if (endPage === totalPages) {
+                    startPage = Math.max(1, endPage - 4);
+                }
+            }
+            
+            // 添加页码按钮
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = document.createElement('button');
+                pageBtn.className = `page-btn ${i === currentPage ? 'active' : ''}`;
+                pageBtn.textContent = i;
+                pageBtn.onclick = () => goToPage(i);
+                pageNumbers.appendChild(pageBtn);
+            }
+        }
+
+        // 跳转到指定页面
+        function goToPage(page) {
+            if (page >= 1 && page <= totalPages && page !== currentPage) {
+                currentPage = page;
+                renderTable();
+            }
+        }
+
+        // 改变每页显示数量
+        function changePageSize(newSize) {
+            pageSize = parseInt(newSize);
+            currentPage = 1; // 重置到第一页
+            renderTable();
+        }
+    </script>
+</body>
+</html>
