@@ -67,7 +67,7 @@ def _send_chat_request(messages, json_mode=False):
 
     elif model_supplier == 'openai':  
         # OpenAI 兼容 API调用逻辑
-        url = chat_config.get('base_url')
+        url = chat_config.get('base_url').rstrip('/')+"/chat/completions"
         headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
         payload = {"model": model, "temperature": 0.8, "messages": messages}
         if json_mode:
