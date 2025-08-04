@@ -36,6 +36,7 @@ class GameGenerator:
         # 云端/本地生成开关
         self.if_cloud_image = config.get('AI绘画', {}).get('if_cloud', False)
         self.if_cloud_audio = config.get('SOVITS', {}).get('if_cloud', False)
+        self.if_generate_audio = config.get('SOVITS', {}).get('if_on', True)
         self.prompts_manager = PromptsManager(config_path)
         self.game_directory = os.getcwd()
         self.images_directory = os.path.join(self.game_directory, "images")
@@ -140,7 +141,7 @@ class GameGenerator:
                 }
 
         # 移除文本中的地点标记并统一冒号
-        text_for_dialogue = re.sub(r'\[[^\[\]]+\]', '', line).strip().replace("：", ":")
+        text_for_dialogue = re.sub(r'\[.*?\]', '', line).strip().replace("：", ":")
 
         # 2. 角色和对话文本解析
         if ":" not in text_for_dialogue:
@@ -231,16 +232,17 @@ class GameGenerator:
 
                 # 生成音频
                 generated_audio_filename = ""
-                if character and character in self.character_list:
-                    audio_speaker_id = self.character_list.index(character) + 1
-                    audio_base_filename = f"audio_{next_audio_id}"
-                    next_audio_id += 1
-                    # 支持云端/本地音频生成
-                    if self.if_cloud_audio:
-                        online_generate_audio(text_no_description, audio_speaker_id, audio_base_filename)
-                    else:
-                        generate_audio(text_no_description, audio_speaker_id, audio_base_filename)
-                    generated_audio_filename = f"{audio_base_filename}.wav"
+                if self.if_generate_audio:
+                    if character and character in self.character_list:
+                        audio_speaker_id = self.character_list.index(character) + 1
+                        audio_base_filename = f"audio_{next_audio_id}"
+                        next_audio_id += 1
+                        # 支持云端/本地音频生成
+                        if self.if_cloud_audio:
+                            online_generate_audio(text_no_description, audio_speaker_id, audio_base_filename)
+                        else:
+                            generate_audio(text_no_description, audio_speaker_id, audio_base_filename)
+                        generated_audio_filename = f"{audio_base_filename}.wav"
 
                 # 添加对话记录，使用在处理此行时确定的当前背景
                 self.add_dialogue(character, text_no_location, self.current_background_name, generated_audio_filename)

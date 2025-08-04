@@ -1,8 +1,4 @@
-# 1. 结构更清晰：分离了下载、提交任务、历史查询等功能，易于维护和扩展。
-# 2. 将comfyui和stablediffusion单独模块化，结构更加清晰。
-# 3. 健壮性提升：增加异常处理，图片命名防止覆盖，流程更易追踪。
-# 4. 代码更简洁：删除无用依赖和复杂流程，便于理解和后续开发。
-# 5. 自动创建图片目录，提升兼容性。
+# 基于sana的1秒生成图片的本地版本，插件参考https://github.com/abelxiaoxing/ComfyUI_Sana
 import requests
 import os
 import json
@@ -103,11 +99,11 @@ def ComfyUI_generate_image(prompt, image_name, mode):
     with open(workflow_path, "r", encoding="utf-8") as file:
         prompt_data = json.load(file)
     if mode == 'background':
-        prompt_data["7"]["inputs"]["seed"] = random.randint(1, 1000000)
-        prompt_data["4"]["inputs"]["text"] += prompt
+        prompt_data["5"]["inputs"]["seed"] = random.randint(1, 1000000)
+        prompt_data["5"]["inputs"]["prompt"] += prompt
     if mode == 'character':
         prompt_data["3"]["inputs"]["seed"] = random.randint(1, 1000000)
-        prompt_data["57"]["inputs"]["text"] += prompt
+        prompt_data["3"]["inputs"]["prompt"] += prompt
     result = queue_prompt(prompt_data, ComfyUI_url)
     prompt_id = result.get("prompt_id")
     if not prompt_id:
@@ -120,7 +116,7 @@ def ComfyUI_generate_image(prompt, image_name, mode):
             print("图片下载完成！")
 
             outputs = history[prompt_id].get('outputs', {})
-            output_node = '12' if mode == 'background' else '64'
+            output_node = '7' if mode == 'background' else '10'
             if outputs and output_node in outputs:
                 images = outputs[output_node].get('images', [])
                 for idx, image in enumerate(images):
