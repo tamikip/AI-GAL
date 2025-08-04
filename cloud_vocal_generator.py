@@ -20,8 +20,9 @@ with open(rf"{game_directory}\config.toml", 'r', encoding='utf-8') as f:
 def get_audio_url(content, speaker_id):
     token = config["SOVITS"]["api_key"]
     url = "https://ht.ttson.cn:37284/flashsummary/tts?token=" + token
+    character_id = config.get("sovits", f"model_id{speaker_id}") if 1 <= speaker_id <= 6 else 6
     payload = json.dumps({
-        "voice_id": speaker_id,
+        "voice_id": character_id,
         "text": content,
         "to_lang": "auto",
         "format": "mp3",
@@ -62,7 +63,7 @@ def download_audio(url, save_path):
 
 def online_generate_audio(content, speaker_id, output_name):
     url = get_audio_url(content, speaker_id)
-    download_audio(url,output_name)
+    download_audio(url, output_name)
 
 
 if __name__ == "__main__":
