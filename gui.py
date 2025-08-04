@@ -10,17 +10,22 @@ import webbrowser
 from urllib.parse import urlparse, parse_qs, urlencode
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer, Qt, QSize
-from PyQt5.QtGui import QIcon, QTextCursor, QPixmap
-from PyQt5.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget,  QSizePolicy, QGridLayout
-from qfluentwidgets import (NavigationItemPosition, LineEdit, TitleLabel, TogglePushButton, TransparentToolButton, ComboBox, PushButton, FluentIcon, Theme, setTheme, InfoBar, InfoBarPosition, HyperlinkCard, HorizontalFlipView, PrimaryPushButton, StrongBodyLabel, HyperlinkButton, PasswordLineEdit, FluentWindow, Dialog, IndeterminateProgressBar, MessageBoxBase, SubtitleLabel, SwitchSettingCard, TextEdit, PrimaryPushSettingCard, SingleDirectionScrollArea, CardWidget, theme)
+from PyQt5.QtGui import QIcon, QTextCursor, QPixmap, QIntValidator
+from PyQt5.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget, QSizePolicy, QGridLayout, \
+     QFrame
+from qfluentwidgets import (NavigationItemPosition, LineEdit, TitleLabel, TogglePushButton, TransparentToolButton,
+                            ComboBox, PushButton, FluentIcon, Theme, setTheme, InfoBar, InfoBarPosition, HyperlinkCard,
+                            HorizontalFlipView, PrimaryPushButton, StrongBodyLabel, HyperlinkButton, PasswordLineEdit,
+                            FluentWindow, Dialog, IndeterminateProgressBar, MessageBoxBase, SubtitleLabel,
+                            SwitchSettingCard, TextEdit, PrimaryPushSettingCard, SingleDirectionScrollArea, CardWidget,
+                            theme, Action)
 import update
 import subprocess
 import zipfile
 import toml
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
-
-
 
 # --- 全局路径常量 ---
 GAME_ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
@@ -36,6 +41,7 @@ except FileNotFoundError:
     config = {}
 
 auto_update = config.get('Settings', {}).get('auto_update', False)
+auto_complement = config.get('Settings', {}).get('auto_complement', False)
 
 
 class MainWindow(FluentWindow):
@@ -92,7 +98,7 @@ class MainWindow(FluentWindow):
 
         title_label = TitleLabel("AI GAL 启动器", page)
         title_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        
+
         font = title_label.font()
         font.setPointSize(24)
         title_label.setFont(font)
@@ -135,7 +141,7 @@ class MainWindow(FluentWindow):
 
         bottom_left_label = StrongBodyLabel("AI GAL版本:1.6\nqq群:982330586")
         bottom_left_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
-        
+
         font = bottom_left_label.font()
         font.setPointSize(12)
         bottom_left_label.setFont(font)
@@ -148,10 +154,12 @@ class MainWindow(FluentWindow):
         return page
 
     def success_tips(self, content):
-        InfoBar.success('成功', content, orient=Qt.Horizontal, isClosable=False, position=InfoBarPosition.TOP, duration=2000, parent=self)
+        InfoBar.success('成功', content, orient=Qt.Horizontal, isClosable=False, position=InfoBarPosition.TOP,
+                        duration=2000, parent=self)
 
     def error_tips(self, content):
-        InfoBar.error('失败', content, orient=Qt.Horizontal, isClosable=False, position=InfoBarPosition.TOP, duration=2000, parent=self)
+        InfoBar.error('失败', content, orient=Qt.Horizontal, isClosable=False, position=InfoBarPosition.TOP,
+                      duration=2000, parent=self)
 
     def clean_resource(self):
         folders_to_delete = [
@@ -193,12 +201,14 @@ class MainWindow(FluentWindow):
         sovits_config = self.config.get('SOVITS', {})
         if sovits_config.get('if_on', True) and not sovits_config.get('if_cloud', False):
             if not self.check_web_port(sovits_url):
-                InfoBar.error('本地语音服务出错', "请检查是否已开启本地语音服务", orient=Qt.Vertical, position=InfoBarPosition.BOTTOM_LEFT, duration=-1, parent=self)
+                InfoBar.error('本地语音服务出错', "请检查是否已开启本地语音服务", orient=Qt.Vertical,
+                              position=InfoBarPosition.BOTTOM_LEFT, duration=-1, parent=self)
                 return
 
         if not self.config.get('AI绘画', {}).get('if_cloud', False):
             if not self.check_web_port(comfyui_url):
-                InfoBar.error('本地绘画服务出错', "请检查是否已开启本地绘画服务", orient=Qt.Vertical, position=InfoBarPosition.BOTTOM_RIGHT, duration=-1, parent=self)
+                InfoBar.error('本地绘画服务出错', "请检查是否已开启本地绘画服务", orient=Qt.Vertical,
+                              position=InfoBarPosition.BOTTOM_RIGHT, duration=-1, parent=self)
                 return
         self.success_tips("服务检查完成！准备开始游戏")
         if sys.platform.startswith('win'):
@@ -207,7 +217,6 @@ class MainWindow(FluentWindow):
             QTimer.singleShot(1000, lambda: subprocess.Popen(["/bin/bash", AIGAL_SH_PATH]))
         else:
             self.error_tips("暂不支持此操作系统")
-
 
     def create_story_page(self, title):
         page = QWidget()
@@ -237,30 +246,23 @@ class MainWindow(FluentWindow):
         input_field2.setText(outline_path)
         input_field2.setMinimumHeight(40)
         input_field2.textChanged.connect(lambda: self.save_config('剧情', 'outline', input_field2.text()))
-
-        button = TransparentToolButton(FluentIcon.FOLDER_ADD)
-        button.setMinimumSize(50, 40)
-        button.clicked.connect(lambda: self.openFileDialog(input_field2, "文本文件 (*.txt)"))
-
-        h_layout = QHBoxLayout()
-        h_layout.addWidget(input_field2)
-        h_layout.addWidget(button)
+        action1 = Action(FluentIcon.FOLDER_ADD, "",
+                         triggered=lambda: self.openFileDialog(input_field2, "文本文件 (*.txt)"))
+        input_field2.addAction(action1, LineEdit.TrailingPosition)
 
         comboBox = ComboBox()
         items = ['中文', '英文', '日文']
+        comboBox.setMinimumHeight(40)
         comboBox.addItems(items)
         if theme_language in items:
             comboBox.setCurrentIndex(items.index(theme_language))
         comboBox.currentIndexChanged.connect(lambda idx: self.save_config('剧情', 'Language', items[idx]))
 
-        input_layout = QVBoxLayout()
-        input_layout.setSpacing(40)
-        input_layout.setContentsMargins(10, 10, 10, 10)
+        input_layout.addWidget(comboBox)
         input_layout.addWidget(input_field1)
-        input_layout.addLayout(h_layout)
+        input_layout.addWidget(input_field2)
 
         layout.addWidget(title_label)
-        layout.addWidget(comboBox)
         layout.addLayout(input_layout)
         return page
 
@@ -296,11 +298,11 @@ class MainWindow(FluentWindow):
         self.snapshot_list_layout.setAlignment(Qt.AlignTop)
         self.snapshot_list_layout.setContentsMargins(0, 0, 0, 0)
         self.snapshot_list_widget.setStyleSheet("background: transparent;")
-        
+
         self.refresh_snapshot_list()
 
         scroll_area.setWidget(self.snapshot_list_widget)
-        
+
         layout.addLayout(header_layout)
         layout.addWidget(scroll_area, 1)
         return page
@@ -322,37 +324,38 @@ class MainWindow(FluentWindow):
                 snapshot_base_name = snapshot_name.removesuffix(".zip")
                 card = self.create_snapshot_card(snapshot_base_name)
                 self.snapshot_list_layout.addWidget(card)
-        
+
         self.snapshot_list_layout.addStretch(1)
 
     def create_snapshot_card(self, snapshot_base_name):
         card = CardWidget()
         card_layout = QHBoxLayout(card)
         card_layout.setContentsMargins(10, 10, 10, 10)
-        
+
         thumbnail_path = os.path.join(self.snapshot_folder, f"{snapshot_base_name}.png")
         thumbnail_label = TitleLabel()
         thumbnail_label.setFixedSize(200, 120)
-        
+
         if os.path.exists(thumbnail_path):
             pixmap = QPixmap(thumbnail_path).scaled(200, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             thumbnail_label.setPixmap(pixmap)
         else:
             thumbnail_label.setText("无缩略图")
-            thumbnail_label.setStyleSheet("background-color: #f0f0f0; color: #888; border: 1px solid #ddd; border-radius: 4px;")
+            thumbnail_label.setStyleSheet(
+                "background-color: #f0f0f0; color: #888; border: 1px solid #ddd; border-radius: 4px;")
             thumbnail_label.setAlignment(Qt.AlignCenter)
-        
+
         info_label = StrongBodyLabel(snapshot_base_name)
         info_label.setStyleSheet("font-size: 20px; color: #333;")
         card_layout.addWidget(info_label, 1)  # 1表示可伸展
         restore_button = PushButton("还原快照")
         restore_button.setFixedSize(150, 50)
         restore_button.clicked.connect(lambda _, name=snapshot_base_name: self.restore_snapshot(name))
-        
+
         card_layout.addWidget(thumbnail_label)
         card_layout.addWidget(info_label, 1)
         card_layout.addWidget(restore_button)
-        
+
         return card
 
     def find_first_1920x1080_image(self):
@@ -394,17 +397,17 @@ class MainWindow(FluentWindow):
         text_heights = [draw.textbbox((0, 0), line, font=font)[3] for line in lines]
         total_text_height = sum(text_heights) + (len(lines) - 1) * 10
         y = (image_height - total_text_height) / 2
-        
+
         padding = 10
         bg_x1, bg_y1 = image_width * 0.1, y - padding
         bg_x2, bg_y2 = image_width * 0.9, y + total_text_height + padding
-        
+
         overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
         overlay_draw = ImageDraw.Draw(overlay)
         overlay_draw.rectangle([bg_x1, bg_y1, bg_x2, bg_y2], fill=(0, 0, 0, 150))
         image = Image.alpha_composite(image, overlay)
         draw = ImageDraw.Draw(image)
-        
+
         outline_color = "black"
         for line in lines:
             text_bbox = draw.textbbox((0, 0), line, font=font)
@@ -415,7 +418,7 @@ class MainWindow(FluentWindow):
                 draw.text((x + dx, y + dy), line, font=font, fill=outline_color)
             draw.text((x, y), line, font=font, fill="white")
             y += text_height + 10
-        
+
         image = image.resize((640, 360), Image.LANCZOS)
         image.convert("RGB").save(output_path)
 
@@ -444,7 +447,7 @@ class MainWindow(FluentWindow):
 
     def packer(self, title):
         os.makedirs(self.snapshot_folder, exist_ok=True)
-        
+
         directories = ["audio", "images", "music"]
         files_to_pack = ["characters.txt", "character_info.txt", "choice.txt", "story.txt", "dialogues.json"]
 
@@ -477,7 +480,7 @@ class MainWindow(FluentWindow):
             font = ImageFont.truetype("SourceHanSansLite.ttf", 40)
         except IOError:
             font = ImageFont.load_default()
-        
+
         text_bbox = draw.textbbox((0, 0), text, font=font)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
@@ -510,7 +513,7 @@ class MainWindow(FluentWindow):
         self.log_viewer.setReadOnly(True)
         self.log_viewer.setStyleSheet("background-color: #f5f5f5; padding: 12px; font-size: 18px;")
         layout.addWidget(self.log_viewer)
-        
+
         self.log_file_path = AIGAL_LOG_PATH
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_logs)
@@ -551,19 +554,19 @@ class MainWindow(FluentWindow):
 
         # 模型供应商列表
         supplier_layout = QHBoxLayout()
-        supplier_label = StrongBodyLabel("模型供应商:", page)
+        supplier_label = StrongBodyLabel("模型供应商(OpenAI选项可兼容第三方服务商):", page)
         supplier_combo = ComboBox()
         suppliers = ['OpenAI', 'GoogleAIstudio', 'Ollama']
         supplier_combo.addItems(suppliers)
         if model_supplier in suppliers:
             supplier_combo.setCurrentIndex(suppliers.index(model_supplier))
-        
+
         supplier_layout.addWidget(supplier_label)
         supplier_layout.addWidget(supplier_combo)
         supplier_layout.setContentsMargins(10, 10, 10, 20)
 
         input_field1 = LineEdit(page)
-        input_field1.setPlaceholderText("请输入LLM的转发URL")
+        input_field1.setPlaceholderText("请输入LLM的转发URL,应该以/v1结尾")
         input_field1.setText(url)
 
         input_field2 = LineEdit(page)
@@ -699,47 +702,43 @@ class MainWindow(FluentWindow):
         sovits_config = self.config.get('SOVITS', {})
         if_cloud = sovits_config.get('if_cloud', False)
         api_key = sovits_config.get('api_key', '')
-        if_on = sovits_config.get('if_on', True) 
+        if_on = sovits_config.get('if_on', True)
 
         # --- 顶部控件 ---
         toggle_button = TogglePushButton('云端模式', self, FluentIcon.CLOUD)
         toggle_button.setChecked(if_cloud)
         toggle_button.toggled.connect(lambda checked: self.save_config('SOVITS', 'if_cloud', checked))
 
+        toggle_button2 = TogglePushButton('开关', self, FluentIcon.PLAY)
+        toggle_button2.setChecked(if_on)
+        toggle_button2.toggled.connect(lambda checked: self.save_config('SOVITS', 'if_on', checked))
+
         help_button = HyperlinkButton(FluentIcon.HELP, "https://tamikip.github.io/AI-GAL-doc/", "帮助")
 
         header_layout = QHBoxLayout()
         header_layout.addWidget(toggle_button)
+        header_layout.addWidget(toggle_button2)
         header_layout.addStretch(1)
         header_layout.addWidget(help_button)
 
-        api_key_input = LineEdit(page)
+        api_key_input = PasswordLineEdit(page)
         api_key_input.setPlaceholderText("云端语音API密钥")
         api_key_input.setText(api_key)
         api_key_input.setMinimumHeight(40)
         api_key_input.textChanged.connect(lambda text: self.save_config('SOVITS', 'api_key', text))
 
-        # --- 添加启用语音的开关 ---
-        voice_toggle_card = SwitchSettingCard(
-            FluentIcon.MICROPHONE,
-            "启用语音",
-            "是否在游戏中生成角色语音",
-            parent=page
-        )
-        voice_toggle_card.setChecked(if_on)
-        voice_toggle_card.checkedChanged.connect(
-            lambda checked: self.save_config('SOVITS', 'if_on', checked)
-        )
-
         layout.addWidget(title_label)
         layout.addLayout(header_layout)
         layout.addWidget(api_key_input)
-        layout.addWidget(voice_toggle_card)
 
-        # --- 动态模型输入区 ---
-        input_layout = QVBoxLayout()
-        input_layout.setSpacing(15)
-        input_layout.setContentsMargins(0, 10, 0, 10)
+        # --- 创建主水平布局 ---
+        main_layout = QHBoxLayout()
+        main_layout.setContentsMargins(0, 10, 0, 10)
+        main_layout.setSpacing(20)
+
+        # === 左侧模型配置区 ===
+        left_layout = QVBoxLayout()
+        left_layout.setSpacing(15)
 
         models = sovits_config.get('models', [])
         placeholders = ["男主", "女主1", "女主2", "女主3", "女主4", "女主5"]
@@ -757,24 +756,67 @@ class MainWindow(FluentWindow):
             if 'prompt_language' not in query_params:
                 query_params['prompt_language'] = ['zh']
             new_query = urlencode(query_params, doseq=True)
-            return parsed_url._replace(query=new_query).geturl()
+            return parsed_url._replace(query=new_query).geturl()  # 添加返回值
+
+        def openFileDialog(ref_line, prompt_line):
+            filepath, _ = QFileDialog.getOpenFileName(
+                self,
+                "选择音频文件",
+                "",
+                "音频文件 (*.mp3 *.wav)"
+            )
+
+            if filepath:
+                ref_line.setText(filepath)
+                if auto_complement:
+                    audio_name = os.path.splitext(os.path.basename(filepath))[0]
+                    prompt_line.setText(audio_name.strip('_'))
+                return filepath
+
+        # === 右侧ID输入区 ===
+        right_layout = QVBoxLayout()
+        right_layout.setAlignment(Qt.AlignTop)
+        right_layout.setSpacing(15)
+
+        # 预创建6个ID输入框
+        id_inputs = []
+        for i in range(6):
+            id_input = LineEdit(page)
+            id_input.setPlaceholderText(f"ID")
+            id_input.setValidator(QIntValidator())
+            id_input.setFixedWidth(80)  # 固定宽度
+            id_input.setMinimumHeight(40)
+            id_value = sovits_config.get(f'model_id{i + 1}', '')
+            id_input.setText(id_value)
+
+            def create_save_func(id_num):
+                return lambda text: self.save_config('SOVITS', f'model_id{id_num}', text)
+
+            id_input.textChanged.connect(create_save_func(i + 1))
+
+            id_inputs.append(id_input)
+            right_layout.addWidget(id_input)
+
+        # === 创建6行模型配置+ID输入 ===
+        def save_and_update_config():
+            self.save_config('SOVITS', 'models', models)
 
         for i, model_data in enumerate(models):
-            h_layout = QHBoxLayout()
-            
+            row_layout = QHBoxLayout()
+
+            # --- 左侧模型配置 ---
+            model_config_layout = QHBoxLayout()
+
             model_name = model_data.get('name', '')
             url = model_data.get('url', '')
-            
+
             ref_audio = get_url_param(url, 'ref_audio_path')
             prompt_text = get_url_param(url, 'prompt_text')
-            
+
             ref_audio_input = LineEdit(page)
             ref_audio_input.setPlaceholderText(f"{placeholders[i]} 参考音频")
             ref_audio_input.setText(ref_audio)
             ref_audio_input.setReadOnly(True)
-
-            file_button = TransparentToolButton(FluentIcon.FOLDER_ADD)
-            file_button.clicked.connect(lambda _, le=ref_audio_input: self.openFileDialog(le, "音频文件 (*.mp3 *.wav)"))
 
             prompt_input = LineEdit(page)
             prompt_input.setPlaceholderText("参考音频文本")
@@ -784,32 +826,52 @@ class MainWindow(FluentWindow):
             model_input.setPlaceholderText("模型名称(本地)")
             model_input.setText(model_name)
 
-            for widget in [ref_audio_input, prompt_input, model_input, file_button]:
+            for widget in [ref_audio_input, prompt_input, model_input]:
                 widget.setMinimumHeight(40)
 
-            def save_and_update_config():
-                self.save_config('SOVITS', 'models', models)
+            action2 = Action(FluentIcon.FOLDER_ADD, "",
+                             triggered=lambda checked, le=ref_audio_input, pe=prompt_input:
+                             openFileDialog(le, pe))
 
-            ref_audio_input.textChanged.connect(lambda text, i=i: [
-                models[i].update({'url': update_url_param(models[i].get('url'), 'ref_audio_path', text)}),
-                save_and_update_config()
-            ])
-            prompt_input.textChanged.connect(lambda text, i=i: [
-                models[i].update({'url': update_url_param(models[i].get('url'), 'prompt_text', text)}),
-                save_and_update_config()
-            ])
-            model_input.textChanged.connect(lambda text, i=i: [
-                models[i].update({'name': text}),
+            ref_audio_input.addAction(action2, LineEdit.TrailingPosition)
+
+            ref_audio_input.textChanged.connect(lambda text, index=i: [
+                models[index].update({'url': update_url_param(models[index].get('url'), 'ref_audio_path', text)}),
                 save_and_update_config()
             ])
 
-            h_layout.addWidget(ref_audio_input, 2)
-            h_layout.addWidget(file_button)
-            h_layout.addWidget(prompt_input, 2)
-            h_layout.addWidget(model_input, 1)
-            input_layout.addLayout(h_layout)
+            prompt_input.textChanged.connect(lambda text, index=i: [
+                models[index].update({'url': update_url_param(models[index].get('url'), 'prompt_text', text)}),
+                save_and_update_config()
+            ])
 
-        layout.addLayout(input_layout)
+            model_input.textChanged.connect(lambda text, index=i: [
+                models[index].update({'name': text}),
+                save_and_update_config()
+            ])
+
+            model_config_layout.addWidget(ref_audio_input, 2)
+            model_config_layout.addWidget(prompt_input, 2)
+            model_config_layout.addWidget(model_input, 1)
+
+            # --- 添加分隔线 ---
+            line = QFrame()
+            line.setFrameShape(QFrame.VLine)
+            line.setFrameShadow(QFrame.Sunken)
+            line.setLineWidth(1)
+            line.setStyleSheet("color: #888; margin: 0 10px;")
+
+            # --- 右侧ID输入 ---
+            id_input = id_inputs[i] if i < len(id_inputs) else LineEdit(page)
+
+            # --- 组合行布局 ---
+            row_layout.addLayout(model_config_layout, 5)
+            row_layout.addWidget(line)
+            row_layout.addWidget(id_input, 1)
+
+            left_layout.addLayout(row_layout)
+
+        layout.addLayout(left_layout)
         return page
 
     def openFileDialog(self, lineEdit, file_type):
@@ -884,13 +946,20 @@ class MainWindow(FluentWindow):
         theme_card.checkedChanged.connect(self.on_theme_change)
         layout.addWidget(theme_card)
 
-        json_mode_card = SwitchSettingCard(FluentIcon.CODE, "强制json输出", "兼容JsonMode的模型可提高准确性，推荐开启。若剧情生成失败可关闭，本地LLM请关闭。")
+        json_mode_card = SwitchSettingCard(FluentIcon.CODE, "强制json输出",
+                                           "兼容JsonMode的模型可提高准确性，推荐开启。若剧情生成失败可关闭，本地LLM请关闭。")
         json_mode_card.setChecked(settings_config.get('json_mode', True))
         json_mode_card.checkedChanged.connect(self.json_mode)
         layout.addWidget(json_mode_card)
 
+        auto_complement_card = SwitchSettingCard(FluentIcon.EDIT, "自动补全",
+                                                 "可以依据音频的名称自动补全sovits页面音频的台词，可能会有bug")
+        auto_complement_card.setChecked(settings_config.get('auto_complement', True))
+        auto_complement_card.checkedChanged.connect(self.on_auto_complement_toggle)
+        layout.addWidget(auto_complement_card)
 
-        doc_card = HyperlinkCard("https://tamikip.github.io/AI-GAL-doc", "查看", FluentIcon.QUICK_NOTE, "使用文档", "不会使用？来看！")
+        doc_card = HyperlinkCard("https://tamikip.github.io/AI-GAL-doc", "查看", FluentIcon.QUICK_NOTE, "使用文档",
+                                 "不会使用？来看！")
         layout.addWidget(doc_card)
 
         about_card = PrimaryPushSettingCard("检查更新", FluentIcon.INFO, "关于", "© 版权所有2025，TamikiP. 当前版本1.6")
@@ -913,8 +982,10 @@ class MainWindow(FluentWindow):
         cards_data = [
             ("https://pan.quark.cn/s/2c832199b09b", "AI绘画整合包", "下载AI绘画整合包", FluentIcon.PALETTE),
             ("https://tusiart.com/", "吐司AI", "AI绘画模型资源，云端模型也可以在这里看模型id", FluentIcon.CLOUD),
-            ("https://www.123pan.com/s/5tIqVv-GVRcv.html", "GPT-SOVITS整合包", "下载GPT-SOVITS整合包", FluentIcon.MICROPHONE),
-            ("https://www.ai-hobbyist.com/forum-138-1.html", "GPT-SOVITS模型资源", "各种各样的模型资源", FluentIcon.CLOUD)
+            ("https://www.123pan.com/s/5tIqVv-GVRcv.html", "GPT-SOVITS整合包", "下载GPT-SOVITS整合包",
+             FluentIcon.MICROPHONE),
+            ("https://www.ai-hobbyist.com/forum-138-1.html", "GPT-SOVITS模型资源", "各种各样的模型资源",
+             FluentIcon.CLOUD)
         ]
 
         for url, card_title, content, icon in cards_data:
@@ -940,6 +1011,13 @@ class MainWindow(FluentWindow):
         status = "启用" if checked else "禁用"
         InfoBar.info("自动更新", f"自动更新已{status}", position=InfoBarPosition.TOP_RIGHT, parent=self)
 
+    def on_auto_complement_toggle(self, checked):
+        global auto_complement
+        self.save_config("Settings", "auto_complement", checked)
+        auto_complement = checked
+        status = "启用" if checked else "禁用"
+        InfoBar.info("自动更新", f"自动更新已{status}", position=InfoBarPosition.TOP_RIGHT, parent=self)
+
     def json_mode(self, checked):
         self.save_config("Settings", "json_mode", checked)
         status = "启用" if checked else "禁用"
@@ -952,6 +1030,7 @@ class MainWindow(FluentWindow):
 
 class Worker(QThread):
     finished = pyqtSignal()
+
     def run(self):
         update.update_program()
         self.finished.emit()
@@ -981,13 +1060,15 @@ def showMessage(window):
         if w.exec():
             pass
 
+
 def updater():
     with open("version.txt", "r") as file:
         version = file.read()
     try:
         latest_version = update.get_latest_release()["tag_name"]
         if not latest_version == version:
-            update_docx = requests.get("https://github.moeyy.xyz/https://raw.githubusercontent.com/tamikip/AI-GAL/main/update_docx.txt").text
+            update_docx = requests.get(
+                "https://github.moeyy.xyz/https://raw.githubusercontent.com/tamikip/AI-GAL/main/update_docx.txt").text
             w = Dialog(f"AI GAL可以更新到{latest_version}版本！", update_docx)
             w.yesButton.setText("更新")
             w.cancelButton.setText("稍后")
@@ -1002,8 +1083,8 @@ def updater():
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
-    setTheme(Theme.DARK)
     window.show()
+    setTheme(Theme.DARK)
     if auto_update:
         updater()
     sys.exit(app.exec_())
