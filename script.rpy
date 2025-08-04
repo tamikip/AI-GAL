@@ -54,7 +54,8 @@ init python:
         global ok
         ok = False
         result = gpt_context(f"现在你要扮演以下角色:{system},你的语气应当生动，有自己的情绪，尽量让对话流畅自然。你的话语会让人觉得可爱和有趣，并逐渐展露暖面,语言简短精炼，不要用()", ask, history=history)
-        generate_audio(translate(result), id, "response")
+        if generator.if_generate_audio:
+            generate_audio(translate(result), id, "response")
         result_container.append(result)
         ok = True
 
@@ -132,7 +133,8 @@ label talk_mode:
             $ renpy.pause(0.5, hard=True)
         $ response = response_container[0]
         $ renpy.show(character, at_list=[shake])
-        $ renpy.sound.play("audio/response.wav", channel='sound')
+        if generator.if_generate_audio:
+            $ renpy.sound.play("audio/response.wav", channel='sound')
         $ renpy.say(character, f"『{response}』")
         $ history.append({"role": "assistant", "content": response})
         $ history.append({"role": "user", "content": ask})
@@ -195,7 +197,7 @@ label start:
 
         if character_name not in characters:
             $ characters[character_name] = Character(character_name)
-        if character_name:
+        if character_name and generator.if_generate_audio:
             $ renpy.sound.play(audio, channel='sound')
         # 仅当背景发生变化时才更新
         if background_image and background_image != last_background_image:

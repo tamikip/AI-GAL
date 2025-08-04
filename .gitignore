@@ -6,9 +6,11 @@
 *.ttf
 *.bat
 *.rpyc
+*.tmp
 uv.lock
 gui.rpy
 config.toml
+cache/
 .vscode/
 audio/
 gui/
@@ -18,3 +20,4 @@ saves/
 speaker_audio/
 talk/
 tl/
+font/
