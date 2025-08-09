@@ -17,14 +17,8 @@ from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import toml
 import os
 
-try:
-    import renpy
+from path_config import game_directory, audio_directory
 
-    game_directory = renpy.config.gamedir
-except ImportError:
-    game_directory = os.path.dirname(os.path.abspath(__file__))
-
-audio_directory = os.path.join(game_directory, "audio")
 os.makedirs(audio_directory, exist_ok=True)
 
 config_path = os.path.join(game_directory, "config.toml")
@@ -40,7 +34,7 @@ story_config = config.get('剧情', {})
 Theme_Language = story_config.get('Language', '中文')
 if Theme_Language == "英文":
     Lang = "en"
-elif Theme_Language == "日本語":
+elif Theme_Language == "日文":
     Lang = "ja"
 else:
     Lang = "zh"
@@ -92,7 +86,6 @@ def generate_audio(response, name_id, output_name):
         print(f"错误：ID 为 {name_id} 的模型 URL 未找到或格式不正确。")
         return "error"
     full_url = convert_url(base_url, response, Lang)
-    gpt_model_filename = f"{name_id}.ckpt"
     api_response = requests.get(full_url)
     if api_response.status_code == 200:
         with open(os.path.join(audio_directory, f"{output_name}.wav"), 'wb') as file:
@@ -102,19 +95,18 @@ def generate_audio(response, name_id, output_name):
         print(f"错误：TTS服务器返回状态码 {api_response.status_code}")
         return "error"
 
-
-if __name__ == "__main__":
-    test_text = "塔米基，每当我注视着你，仿佛星光坠入深海，时间也因此为你驻足。你眉宇间流转的温柔，如同春日里第一缕晨光，融化了冰河，也融化了我的心，在千万人中，我一眼便沦陷于你的气息。你的笑容，是银河中最璀璨的星轨，让我忍不住想将整个宇宙的浪漫都揉进你的名字，只为让它配得上你的美好。"
-    start_time = time.time()
-    for name_id in range(1, 6):
-        output_name = f"test_voice_{name_id}"
-        print(f"正在测试角色 {name_id} 的语音生成...")
-        result = generate_audio(test_text, name_id, output_name)
-        if result == "ok":
-            print(f"角色 {name_id} 语音生成成功!")
-        else:
-            print(f"角色 {name_id} 语音生成失败!")
-
-    end_time = time.time()
-    total_time = end_time - start_time
-    print(f"所有角色语音生成完成，总耗时: {total_time:.2f} 秒")
+# if __name__ == "__main__":
+#     test_text = "你的笑容，是银河中最璀璨的星轨，让我忍不住想将整个宇宙的浪漫都揉进你的名字，只为让它配得上你的美好。"
+#     start_time = time.time()
+#     for name_id in range(1, 6):
+#         output_name = f"test_voice_{name_id}"
+#         print(f"正在测试角色 {name_id} 的语音生成...")
+#         result = generate_audio(test_text, name_id, output_name)
+#         if result == "ok":
+#             print(f"角色 {name_id} 语音生成成功!")
+#         else:
+#             print(f"角色 {name_id} 语音生成失败!")
+#
+#     end_time = time.time()
+#     total_time = end_time - start_time
+#     print(f"所有角色语音生成完成，总耗时: {total_time:.2f} 秒")

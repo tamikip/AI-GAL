@@ -8,12 +8,7 @@ from datetime import datetime
 import base64
 import toml
 
-try:
-    import renpy
-    game_directory = renpy.config.gamedir
-except:
-    game_directory = os.getcwd()
-images_directory = os.path.join(game_directory, "images")
+from path_config import game_directory, images_directory
 
 config_path = os.path.join(game_directory, "config.toml")
 with open(config_path, 'r', encoding="utf-8") as f:

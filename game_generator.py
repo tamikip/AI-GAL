@@ -19,6 +19,7 @@ from cloud_image_generator import online_generate_image
 from local_vocal_generator import generate_audio
 from cloud_vocal_generator import online_generate_audio
 import time
+from path_config import game_directory, images_directory, audio_directory
 
 ILLEGAL_CHAR_REPLACEMENTS = {'!': '！', '?': '？', ':': '：', '"': '“', '/': '／', '\\': '＼', '|': '｜', '*': '＊', '<': '＜',
                              '>': '＞'}
@@ -38,8 +39,8 @@ class GameGenerator:
         self.if_cloud_audio = config.get('SOVITS', {}).get('if_cloud', False)
         self.if_generate_audio = config.get('SOVITS', {}).get('if_on', True)
         self.prompts_manager = PromptsManager(config_path)
-        self.game_directory = os.getcwd()
-        self.images_directory = os.path.join(self.game_directory, "images")
+        self.game_directory = game_directory
+        self.images_directory = images_directory
         os.makedirs(self.images_directory, exist_ok=True)
         self.dialogues = {"conversations": []}
         self.background_list = []
@@ -239,9 +240,9 @@ class GameGenerator:
                         next_audio_id += 1
                         # 支持云端/本地音频生成
                         if self.if_cloud_audio:
-                            online_generate_audio(text_no_description, audio_speaker_id, audio_base_filename)
+                            online_generate_audio(text_no_description, audio_speaker_id, audio_full_path)
                         else:
-                            generate_audio(text_no_description, audio_speaker_id, audio_base_filename)
+                            generate_audio(text_no_description, audio_speaker_id, audio_full_path)
                         generated_audio_filename = f"{audio_base_filename}.wav"
 
                 # 添加对话记录，使用在处理此行时确定的当前背景

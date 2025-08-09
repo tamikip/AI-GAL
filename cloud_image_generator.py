@@ -7,13 +7,8 @@ import json
 import time
 import os
 
-try:
-    import renpy
-    game_directory = renpy.config.gamedir
-except:
-    game_directory = os.getcwd()
+from path_config import game_directory, images_directory
 
-images_directory = os.path.join(game_directory, "images")
 with open(rf"{game_directory}\config.toml", 'r', encoding='utf-8') as f:
     config = toml.load(f)
 online_draw_key = config['AI绘画']['draw_key']
