@@ -3,9 +3,11 @@ import requests
 import toml
 import time
 import json
-from path_config import game_directory,audio_directory
+from path_config import game_directory, audio_directory
 import os
-with open(rf"{game_directory}\config.toml", 'r', encoding='utf-8') as f:
+
+config_path = os.path.join(game_directory, "config.toml")
+with open(config_path, 'r', encoding='utf-8') as f:
     config = toml.load(f)
 
 

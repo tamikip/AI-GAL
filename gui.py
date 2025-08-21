@@ -23,7 +23,6 @@ import update
 import subprocess
 import zipfile
 import toml
-from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -347,7 +346,7 @@ class MainWindow(FluentWindow):
 
         info_label = StrongBodyLabel(snapshot_base_name)
         info_label.setStyleSheet("font-size: 20px; color: #333;")
-        card_layout.addWidget(info_label, 1)  # 1表示可伸展
+        card_layout.addWidget(info_label, 1)
         restore_button = PushButton("还原快照")
         restore_button.setFixedSize(150, 50)
         restore_button.clicked.connect(lambda _, name=snapshot_base_name: self.restore_snapshot(name))
@@ -784,7 +783,7 @@ class MainWindow(FluentWindow):
             id_input = LineEdit(page)
             id_input.setPlaceholderText(f"ID")
             id_input.setValidator(QIntValidator())
-            id_input.setFixedWidth(80)  # 固定宽度
+            id_input.setFixedWidth(80)
             id_input.setMinimumHeight(40)
             id_value = sovits_config.get(f'model_id{i + 1}', '')
             id_input.setText(id_value)

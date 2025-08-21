@@ -12,6 +12,7 @@ init python:
     from game_generator import GameGenerator
     from GPT import gpt_context
     from local_vocal_generator import generate_audio
+    from cloud_vocal_generator import online_generate_audio
 
     config_path = os.path.join(renpy.config.gamedir, "config.toml")
     generator = GameGenerator(config_path)
@@ -55,7 +56,10 @@ init python:
         ok = False
         result = gpt_context(f"现在你要扮演以下角色:{system},你的语气应当生动，有自己的情绪，尽量让对话流畅自然。你的话语会让人觉得可爱和有趣，并逐渐展露暖面,语言简短精炼，不要用()", ask, history=history)
         if generator.if_generate_audio:
-            generate_audio(translate(result), id, "response")
+            if generator.if_cloud_audio:
+                online_generate_audio(result, id, "response")
+            else:
+                generate_audio(result, id, "response")
         result_container.append(result)
         ok = True
 
@@ -134,7 +138,7 @@ label talk_mode:
         $ response = response_container[0]
         $ renpy.show(character, at_list=[shake])
         if generator.if_generate_audio:
-            $ renpy.sound.play("audio/response.wav", channel='sound')
+            $ renpy.sound.play("audio/response.mp3", channel='sound')
         $ renpy.say(character, f"『{response}』")
         $ history.append({"role": "assistant", "content": response})
         $ history.append({"role": "user", "content": ask})
@@ -149,8 +153,8 @@ label start:
     if os.path.getsize(os.path.join(game_directory, "story.txt")) == 0:
         $ t = threading.Thread(target=generator.main, daemon=True)
         show sea
-        "大纲生成中..."
         $ t.start()
+        "大纲生成中..."
         while generator.already_state != "complete":
             if generator.already_state == "story":
                 "故事生成中..."
@@ -161,15 +165,16 @@ label start:
             $ renpy.pause(1, hard=True)
         scene black
         stop music
-    "资源加载完成,单击开始游戏"
-    $ renpy.pause(1, hard=True)
-    scene warning
-    $ renpy.pause(5, hard=True)
+        "资源加载完成,单击开始游戏"
+        $ renpy.pause(1, hard=True)
+        scene warning
+        $ renpy.pause(5, hard=True)
 
 
     stop music
     if os.path.exists(os.path.join(game_directory, "music", "happy bgm.mp3")):
-        play music [ "music/happy bgm.mp3", "music/happy bgm2.mp3" ] fadeout 2.0 fadein 2.0
+#         play music [ "music/happy bgm.mp3", "music/happy bgm2.mp3" ] fadeout 2.0 fadein 2.0
+        play music "music/galgame2" fadeout 2.0 fadein 2.0
     while True:
         $ dialogue = get_next_dialogue()
 

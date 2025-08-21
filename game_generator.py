@@ -240,10 +240,10 @@ class GameGenerator:
                         next_audio_id += 1
                         # 支持云端/本地音频生成
                         if self.if_cloud_audio:
-                            online_generate_audio(text_no_description, audio_speaker_id, audio_full_path)
+                            online_generate_audio(text_no_description, audio_speaker_id, audio_base_filename)
                         else:
-                            generate_audio(text_no_description, audio_speaker_id, audio_full_path)
-                        generated_audio_filename = f"{audio_base_filename}.wav"
+                            generate_audio(text_no_description, audio_speaker_id, audio_base_filename)
+                        generated_audio_filename = f"{audio_base_filename}.mp3"
 
                 # 添加对话记录，使用在处理此行时确定的当前背景
                 self.add_dialogue(character, text_no_location, self.current_background_name, generated_audio_filename)
@@ -294,6 +294,7 @@ class GameGenerator:
 
         title = data['title']
         outline = data['outline']
+
         game_world_background = data['background']
         # 角色信息字符串: "名字:性别, 描述"
         characters = "\n".join(

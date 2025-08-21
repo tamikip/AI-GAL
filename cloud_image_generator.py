@@ -9,7 +9,8 @@ import os
 
 from path_config import game_directory, images_directory
 
-with open(rf"{game_directory}\config.toml", 'r', encoding='utf-8') as f:
+config_path = os.path.join(game_directory, "config.toml")
+with open(config_path, 'r', encoding='utf-8') as f:
     config = toml.load(f)
 online_draw_key = config['AI绘画']['draw_key']
 url = "https://cn.tensorart.net/v1/jobs"
@@ -114,3 +115,7 @@ def get_result(job_id, image_name):
 def online_generate_image(prompt, image_name, mode):
     task_id = online_generate(prompt, mode)
     get_result(task_id, image_name)
+
+
+if __name__ == "__main__":
+    online_generate_image("genshin impact", "miku", "character")
