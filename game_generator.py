@@ -34,7 +34,6 @@ class GameGenerator:
         self.theme_language = story_config.get('language', '中文')
         self.theme = story_config.get('theme', {})
         self.if_generate_music = music_config.get('if_on', False)
-        # 云端/本地生成开关
         self.if_cloud_image = config.get('AI绘画', {}).get('if_cloud', False)
         self.if_cloud_audio = config.get('SOVITS', {}).get('if_cloud', False)
         self.if_generate_audio = config.get('SOVITS', {}).get('if_on', True)
@@ -194,8 +193,8 @@ class GameGenerator:
         # 1. 预扫描以收集所有新角色
         new_characters = []
         for result in valid_results:
-            if result["new_character"] and result["new_character"] not in self.character_list and result[
-                "new_character"] not in new_characters:
+            if (result["new_character"] and result["new_character"] not in self.character_list and
+                    result["new_character"] not in new_characters):
                 new_characters.append(result["new_character"])
 
         if new_characters:

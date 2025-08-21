@@ -95,18 +95,19 @@ def generate_audio(response, name_id, output_name):
         print(f"错误：TTS服务器返回状态码 {api_response.status_code}")
         return "error"
 
-# if __name__ == "__main__":
-#     test_text = "你的笑容，是银河中最璀璨的星轨，让我忍不住想将整个宇宙的浪漫都揉进你的名字，只为让它配得上你的美好。"
-#     start_time = time.time()
-#     for name_id in range(1, 6):
-#         output_name = f"test_voice_{name_id}"
-#         print(f"正在测试角色 {name_id} 的语音生成...")
-#         result = generate_audio(test_text, name_id, output_name)
-#         if result == "ok":
-#             print(f"角色 {name_id} 语音生成成功!")
-#         else:
-#             print(f"角色 {name_id} 语音生成失败!")
-#
-#     end_time = time.time()
-#     total_time = end_time - start_time
-#     print(f"所有角色语音生成完成，总耗时: {total_time:.2f} 秒")
+
+if __name__ == "__main__":
+    test_text = "你的笑容，是银河中最璀璨的星轨，让我忍不住想将整个宇宙的浪漫都揉进你的名字，只为让它配得上你的美好。"
+    start_time = time.time()
+    for name_id in range(1, 6):
+        output_name = f"test_voice_{name_id}"
+        print(f"正在测试角色 {name_id} 的语音生成...")
+        result = generate_audio(test_text, name_id, output_name)
+        if result == "ok":
+            print(f"角色 {name_id} 语音生成成功!")
+        else:
+            print(f"角色 {name_id} 语音生成失败!")
+
+    end_time = time.time()
+    total_time = end_time - start_time
+    print(f"所有角色语音生成完成，总耗时: {total_time:.2f} 秒")

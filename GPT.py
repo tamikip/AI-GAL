@@ -3,16 +3,12 @@ import toml
 import re
 import json
 import os
-
-try:
-    import renpy
-    game_directory = renpy.config.gamedir
-except:
-    game_directory = os.getcwd()
+from path_config import game_directory
 
 config_path = os.path.join(game_directory, "config.toml")
 with open(config_path, 'r', encoding='utf-8') as f:
     config = toml.load(f)
+
 
 def _send_chat_request(messages, json_mode=False):
     """内部函数，用于发送请求到llm模型"""
@@ -28,7 +24,7 @@ def _send_chat_request(messages, json_mode=False):
     if model_supplier == 'googleaistudio':
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         headers = {'Content-Type': 'application/json'}
-        
+
         system_instruction = None
         if messages and messages[0]['role'] == 'system':
             system_instruction = {"parts": [{"text": messages.pop(0)['content']}]}
@@ -42,7 +38,7 @@ def _send_chat_request(messages, json_mode=False):
         payload = {"contents": google_contents}
         if system_instruction:
             payload['system_instruction'] = system_instruction
-            
+
         generation_config = {"temperature": 0.8}
         if json_mode:
             generation_config["responseMimeType"] = "application/json"
@@ -59,15 +55,15 @@ def _send_chat_request(messages, json_mode=False):
         payload = {"model": model, "messages": messages, "stream": False}
         if json_mode:
             payload["format"] = "json"
-        
+
         response = requests.post(url, headers={'Content-Type': 'application/json'}, json=payload)
         response.raise_for_status()
         data = response.json()
         content = data.get('message', {}).get('content', '')
 
-    elif model_supplier == 'openai':  
+    elif model_supplier == 'openai':
         # OpenAI 兼容 API调用逻辑
-        url = chat_config.get('base_url').rstrip('/')+"/chat/completions"
+        url = chat_config.get('base_url').rstrip('/') + "/chat/completions"
         headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
         payload = {"model": model, "temperature": 0.8, "messages": messages}
         if json_mode:
@@ -90,10 +86,11 @@ def _send_chat_request(messages, json_mode=False):
         # 如果没有代码块，则直接查找 JSON 对象
         elif match := re.search(r'\{.*\}', content, re.DOTALL):
             content = match.group(0)
-            
+
     return content
 
-def gpt(system, prompt, json_mode = False):
+
+def gpt(system, prompt, json_mode=False):
     """单次对话函数"""
     messages = []
     if system:
@@ -101,7 +98,8 @@ def gpt(system, prompt, json_mode = False):
     messages.append({"role": "user", "content": prompt})
     return _send_chat_request(messages, json_mode)
 
-def gpt_context(system, prompt, history, json_mode = False):
+
+def gpt_context(system, prompt, history, json_mode=False):
     """上下文模式的对话函数"""
     messages = []
     if system:

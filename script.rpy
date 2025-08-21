@@ -14,6 +14,7 @@ init python:
     from local_vocal_generator import generate_audio
     from cloud_vocal_generator import online_generate_audio
 
+
     config_path = os.path.join(renpy.config.gamedir, "config.toml")
     generator = GameGenerator(config_path)
 
@@ -66,6 +67,7 @@ init python:
     current_dialogue_index = 0
     characters = {}
     game_directory = renpy.config.gamedir
+    music_path = os.path.join(game_directory, "music", "happy bgm.mp3")
 
     # 追踪最后显示的图像，以避免可能导致闪烁的冗余更新
     last_background_image = ""
@@ -80,22 +82,13 @@ define small_center = Transform(xalign=0.5, yalign=1.0, xpos=0.5, ypos=1.0, xzoo
 image eileen movie = Movie(play="gui/custom/background.webm")
 image load = "gui/custom/load.png"
 
+# 人物抖动样式,仅在对话模式生效
 transform shake:
     yoffset 0
     linear 0.1 yoffset -30
     linear 0.1 yoffset 0
 
-transform spin:
-    xpos 0.05
-    ypos 0.65
-    rotate 0
-    linear 1.0 rotate 360
-    repeat
-
-transform my_position:
-    xalign 0.25
-    yalign 0.8
-
+# 进软件前的logo
 label splashscreen:
     scene black
     play sound "gui/custom/logo.mp3"
@@ -104,6 +97,7 @@ label splashscreen:
     hide logo with Dissolve(1)
     return
 
+# 对话模式
 label talk_mode:
     show eileen movie
     python:
@@ -144,6 +138,7 @@ label talk_mode:
         $ history.append({"role": "user", "content": ask})
     return
 
+# 剧情模式
 label start:
     if not os.path.exists(os.path.join(game_directory, "story.txt")):
         python:
@@ -172,9 +167,17 @@ label start:
 
 
     stop music
-    if os.path.exists(os.path.join(game_directory, "music", "happy bgm.mp3")):
-#         play music [ "music/happy bgm.mp3", "music/happy bgm2.mp3" ] fadeout 2.0 fadein 2.0
-        play music "music/galgame2" fadeout 2.0 fadein 2.0
+    if os.path.exists(music_path):
+        play_music = [
+            os.path.join("music", "happy bgm.mp3").replace("\\", "/"),
+            os.path.join("music", "happy bgm2.mp3").replace("\\", "/")
+        ]
+    else:
+        play_music = [
+            os.path.join("music", "default.mp3").replace("\\", "/"),
+            os.path.join("music", "default2.mp3").replace("\\", "/")
+        ]
+    play music play_music fadeout 2.0 fadein 2.0
     while True:
         $ dialogue = get_next_dialogue()
 

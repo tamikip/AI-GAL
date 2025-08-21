@@ -1,5 +1,3 @@
-# 改用toml
-
 import toml
 import random
 import requests
@@ -31,7 +29,8 @@ def online_generate(prompt, mode):
     else:
         width = 512
         height = 768
-        prompt2 = "masterpiece,wallpaper,(upper_body),face focus,solo,looking at the viewer,((front_view,standing_illustration))," + prompt
+        prompt2 = ("masterpiece,wallpaper,(upper_body),face focus,solo,looking at the viewer,((front_view,"
+                   "standing_illustration)),") + prompt
         model = config['AI绘画'].get('character_id') or "611399039965066695"
 
     data = {

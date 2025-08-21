@@ -1,4 +1,4 @@
-# 基于sana的1秒生成图片的本地版本，插件参考https://github.com/abelxiaoxing/ComfyUI_Sana
+
 import requests
 import os
 import json
