@@ -41,7 +41,6 @@ class GameGenerator:
         self.game_directory = game_directory
         self.images_directory = images_directory
         os.makedirs(self.images_directory, exist_ok=True)
-        self.dialogues = {"conversations": []}
         self.background_list = []
         self.current_background_name = ""
         self.character_list = []
@@ -49,6 +48,8 @@ class GameGenerator:
         self.generate_new_chapters_state = False
         self.already_state = False
         self.next_audio_id = 1  # 音频文件ID计数器
+        with open('dialogues.json', 'r', encoding='utf-8') as f:
+            self.dialogues = json.load(f)
 
     def clean_filename(self, text):
         """替换文本中不适用于文件名的非法字符"""
