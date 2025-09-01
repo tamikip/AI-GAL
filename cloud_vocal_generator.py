@@ -4,6 +4,7 @@ import toml
 import time
 import json
 from path_config import game_directory, audio_directory
+from concurrent.futures import ThreadPoolExecutor
 import os
 
 config_path = os.path.join(game_directory, "config.toml")
@@ -28,7 +29,7 @@ def get_audio_url(content, speaker_id):
     response = requests.request("POST", url, data=payload)
 
     if response.status_code != 200:
-        print(f"Error: {response.status_code}")
+        print(response.text)
         return None
     response_json = response.json()
 
@@ -59,9 +60,56 @@ def online_generate_audio(content, speaker_id, output_name):
     download_audio(url, output_name)
 
 
+def simple_concurrent_test():
+    """简单的并发测试"""
+    test_text = "你的笑容，是银河中最璀璨的星轨，让我忍不住想将整个宇宙的浪漫都揉进你的名字，只为让它配得上你的美好。"
+    num_requests = 8
+    concurrency_levels = [2]  # 测试不同的并发度
+
+    results = {}
+
+    for concurrency in concurrency_levels:
+        time.sleep(2)
+        print(f"\n测试 {concurrency} 并发，{num_requests} 个请求...")
+        start_time = time.time()
+
+        with ThreadPoolExecutor(max_workers=concurrency) as executor:
+            futures = []
+            for i in range(num_requests):
+                filename = f"test_{concurrency}_{i}"
+                future = executor.submit(online_generate_audio, test_text, 2, filename)
+                futures.append(future)
+
+            # 等待所有完成
+            success = 0
+            for future in futures:
+                try:
+                    future.result()
+                    success += 1
+                except Exception as e:
+                    print(f"请求失败: {e}")
+
+        total_time = time.time() - start_time
+        throughput = success / total_time if total_time > 0 else 0
+
+        results[concurrency] = {
+            'total_time': total_time,
+            'success': success,
+            'throughput': throughput,
+            'avg_time': total_time / num_requests
+        }
+
+        print(f"并发 {concurrency}: {total_time:.2f}秒, 吞吐量: {throughput:.2f}请求/秒")
+
+    return results
+
+
 if __name__ == "__main__":
-    start_time = time.time()
-    online_generate_audio("测试,你好", 1, "test")
-    end_time = time.time()
-    execution_time = end_time - start_time
-    print(execution_time)
+    # start_time = time.time()
+    # online_generate_audio(
+    #     "你的笑容，是银河中最璀璨的星轨，让我忍不住想将整个宇宙的浪漫都揉进你的名字，只为让它配得上你的美好。", 2, "test")
+    # end_time = time.time()
+    # execution_time = end_time - start_time
+    # os.startfile(rf"{audio_directory}\test.mp3")
+    # print(f"用时: {execution_time:.2f} 秒")
+    simple_concurrent_test()

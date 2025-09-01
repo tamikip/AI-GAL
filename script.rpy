@@ -168,12 +168,12 @@ label start:
 
     stop music
     if os.path.exists(music_path):
-        play_music = [
+        $ play_music = [
             os.path.join("music", "happy bgm.mp3").replace("\\", "/"),
             os.path.join("music", "happy bgm2.mp3").replace("\\", "/")
         ]
     else:
-        play_music = [
+        $ play_music = [
             os.path.join("music", "default.mp3").replace("\\", "/"),
             os.path.join("music", "default2.mp3").replace("\\", "/")
         ]
@@ -213,7 +213,9 @@ label start:
             $ last_background_image = background_image
         # 仅当立绘发生变化时才更新
         if character_image and character_image != last_character_image:
-            show expression character_image at small_center with dissolve
+            hide character1
+            if character_image != "":
+                show expression character_image at small_center as character1
             $ last_character_image = character_image
         $ text = text[:-1]
         $ renpy.say(characters[character_name], f"『{text}』" if character_name != "" else text)

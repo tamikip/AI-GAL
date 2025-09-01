@@ -10,7 +10,7 @@ import json
 import toml
 import re
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor,as_completed
 from Prompts import PromptsManager
 from GPT import gpt
 from music_generator import generate_music
@@ -39,6 +39,7 @@ class GameGenerator:
         self.if_generate_audio = config.get('SOVITS', {}).get('if_on', True)
         self.prompts_manager = PromptsManager(config_path)
         self.game_directory = game_directory
+        self.dialogues_path = os.path.join(self.game_directory, "dialogues.json")
         self.images_directory = images_directory
         os.makedirs(self.images_directory, exist_ok=True)
         self.background_list = []
@@ -48,7 +49,7 @@ class GameGenerator:
         self.generate_new_chapters_state = False
         self.already_state = False
         self.next_audio_id = 1  # 音频文件ID计数器
-        with open('dialogues.json', 'r', encoding='utf-8') as f:
+        with open(self.dialogues_path, 'r', encoding='utf-8') as f:
             self.dialogues = json.load(f)
 
     def clean_filename(self, text):
@@ -69,8 +70,7 @@ class GameGenerator:
 
     def save_dialogues(self):
         """将 self.dialogues 中的所有对话内容以 JSON 格式保存到 dialogues.json"""
-        dialogues_path = os.path.join(self.game_directory, "dialogues.json")
-        with open(dialogues_path, "w", encoding="utf-8") as file:
+        with open(self.dialogues_path, "w", encoding="utf-8") as file:
             json.dump(self.dialogues, file, indent=4, ensure_ascii=False)
 
     def _generate_character_assets(self, character_info_line):
@@ -109,11 +109,10 @@ class GameGenerator:
         if background_name and background_name not in self.background_list:
             system_msg_background_image = self.prompts_manager.get_background_image_system_message()
             background_image_generation_prompt = gpt(system_msg_background_image, image_prompt_text)
-            # 支持云端/本地背景图片生成
-            if self.if_cloud_image:
-                online_generate_image(background_image_generation_prompt, background_name, "background")
-            else:
-                generate_image(background_image_generation_prompt, background_name, "background")
+            threading_pre_pic = threading.Thread(
+                target=online_generate_image if self.if_cloud_image else generate_image,
+                args=(background_image_generation_prompt, background_name, "background"))
+            threading_pre_pic.start()
             # 更新全局状态，将此背景设为当前背景
             self.background_list.append(background_name)
             self.current_background_name = background_name
@@ -186,67 +185,97 @@ class GameGenerator:
             file.write(cleaned_text)
         return cleaned_text
 
+    # todo:多线程优化
+
     def _process_story_results(self, results):
-        """按顺序处理并行执行的结果"""
-        # 过滤掉由空行产生的None结果
         valid_results = [r for r in results if r is not None]
 
-        # 1. 预扫描以收集所有新角色
+        # 任务收集
+        background_tasks = []
+        audio_tasks = []
+        dialogues = []
+
         new_characters = []
         for result in valid_results:
-            if (result["new_character"] and result["new_character"] not in self.character_list and
-                    result["new_character"] not in new_characters):
+            if (result["new_character"]
+                    and result["new_character"] not in self.character_list
+                    and result["new_character"] not in new_characters):
                 new_characters.append(result["new_character"])
-
         if new_characters:
             self.character_list.extend(new_characters)
 
-        # 2. 按顺序处理每一行的结果，确保状态（如当前背景）正确更新
         next_audio_id = self.next_audio_id
         for result in valid_results:
-            # a. 处理背景变化
+            # 背景任务
             if result["background_change"]:
                 bg_info = result["background_change"]
                 extracted_location_name = bg_info["name"]
-
                 if extracted_location_name != self.current_background_name:
-                    # 仅当这个地点是第一次出现时，才生成新图片
                     if extracted_location_name not in self.background_list:
-                        print(f"检测到新背景: {extracted_location_name}，准备生成...")
                         system_msg_background_image = self.prompts_manager.get_background_image_system_message()
-                        background_image_generation_prompt = gpt(system_msg_background_image, bg_info["prompt_input"])
-                        if self.if_cloud_image:
-                            online_generate_image(background_image_generation_prompt, extracted_location_name,
-                                                  "background")
-                        else:
-                            generate_image(background_image_generation_prompt, extracted_location_name, "background")
-                        self.background_list.append(extracted_location_name)
-
+                        background_prompt = gpt(system_msg_background_image, bg_info["prompt_input"])
+                        background_tasks.append((background_prompt, extracted_location_name))
                     self.current_background_name = extracted_location_name
 
-            # b. 处理对话和音频
+            # 对话和音频任务
             if result["dialogue"]:
                 dialogue = result["dialogue"]
                 character = dialogue["character"]
                 text_no_location = dialogue["text"]
                 text_no_description = dialogue["audio_text"]
 
-                # 生成音频
-                generated_audio_filename = ""
-                if self.if_generate_audio:
-                    if character and character in self.character_list:
-                        audio_speaker_id = self.character_list.index(character) + 1
-                        audio_base_filename = f"audio_{next_audio_id}"
-                        next_audio_id += 1
-                        # 支持云端/本地音频生成
-                        if self.if_cloud_audio:
-                            online_generate_audio(text_no_description, audio_speaker_id, audio_base_filename)
-                        else:
-                            generate_audio(text_no_description, audio_speaker_id, audio_base_filename)
-                        generated_audio_filename = f"{audio_base_filename}.mp3"
+                audio_filename = ""
+                if self.if_generate_audio and character in self.character_list:
+                    audio_speaker_id = self.character_list.index(character) + 1
+                    audio_base_filename = f"audio_{next_audio_id}"
+                    next_audio_id += 1
+                    audio_tasks.append((text_no_description, audio_speaker_id, audio_base_filename))
+                    audio_filename = f"{audio_base_filename}.mp3"
 
-                # 添加对话记录，使用在处理此行时确定的当前背景
-                self.add_dialogue(character, text_no_location, self.current_background_name, generated_audio_filename)
+                dialogues.append((character, text_no_location, self.current_background_name, audio_filename))
+
+        # === 分开两个线程池 ===
+        with ThreadPoolExecutor(max_workers=8) as bg_executor, \
+                ThreadPoolExecutor(max_workers=2) as audio_executor:
+
+            bg_futures = []
+            audio_futures = []
+
+            # 背景任务提交
+            for prompt, name in background_tasks:
+                if self.if_cloud_image:
+                    bg_futures.append(bg_executor.submit(online_generate_image, prompt, name, "background"))
+                else:
+                    bg_futures.append(bg_executor.submit(generate_image, prompt, name, "background"))
+                self.background_list.append(name)
+
+            # 音频任务提交
+            for text, speaker_id, base_filename in audio_tasks:
+                if self.if_cloud_audio:
+                    audio_futures.append(audio_executor.submit(online_generate_audio, text, speaker_id, base_filename))
+                else:
+                    audio_futures.append(audio_executor.submit(generate_audio, text, speaker_id, base_filename))
+
+            # 背景任务完成监听
+            for future in as_completed(bg_futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    print(f"背景任务出错: {e}")
+
+            # 音频任务完成监听
+            for future in as_completed(audio_futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    print(f"音频任务出错: {e}")
+
+        # 添加对话记录
+        for character, text, bg, audio_file in dialogues:
+            self.add_dialogue(character, text, bg, audio_file)
+
+        # 更新音频ID计数器
+        self.next_audio_id = next_audio_id
 
         # 更新音频ID计数器
         self.next_audio_id = next_audio_id
@@ -300,6 +329,15 @@ class GameGenerator:
         characters = "\n".join(
             [f"{character['name']}:{character['gender']}，{character['kind']}" for character in data['characters']])
         self.already_state = "story"
+
+        # todo:多线程
+        characters_lines = [line.strip() for line in characters.splitlines() if ":" in line.strip()]
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            futures = []
+            for char_line in characters_lines:
+                future = executor.submit(self._generate_character_assets, char_line)
+                futures.append(future)
+
         # 2. GPT生成第一章故事内容
         system_msg_story_content = self.prompts_manager.get_generate_story_content_system_message()
         user_msg_story_content_template = self.prompts_manager.get_generate_story_content_user_template()
@@ -321,11 +359,9 @@ class GameGenerator:
         with open(os.path.join(self.game_directory, 'character_info.txt'), 'w', encoding='utf-8') as file:
             file.write(characters)
 
-        # 3. 生成角色形象资源
+        # 3. 生成背景资源
         self.already_state = "picture"
-        characters_lines = [line.strip() for line in characters.splitlines() if ":" in line.strip()]
-        for character_line in characters_lines:
-            self._generate_character_assets(character_line)
+
         # 4. 处理故事内容（生成对话、背景图、音频）
         dialogue_lines = self.story_content.splitlines()
         print(dialogue_lines)
@@ -342,9 +378,10 @@ class GameGenerator:
         end_time = time.time()
         use_time = end_time - start_time
         print(f"游戏 '{title}' 的第一章已生成完毕！")
-        print(f"用时{use_time}秒")
+        print(f"用时{use_time:.2f}秒")
 
     def story_continue(self, choice):
+        start_time = time.time()
         self.generate_new_chapters_state = True
         character_names_for_prompt = ",".join(self.character_list)
         system_msg_continue = self.prompts_manager.get_story_continue_system_message()
@@ -366,6 +403,9 @@ class GameGenerator:
         self.save_dialogues()
         self.generate_new_chapters_state = False
         print("故事续写完成。")
+        end_time = time.time()
+        use_time = end_time - start_time
+        print(f"用时{use_time:.2f}秒")
 
 
 if __name__ == "__main__":

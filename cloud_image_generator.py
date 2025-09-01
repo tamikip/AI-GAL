@@ -117,4 +117,8 @@ def online_generate_image(prompt, image_name, mode):
 
 
 if __name__ == "__main__":
-    online_generate_image("genshin impact", "miku", "character")
+    start_time = time.time()
+    online_generate_image("a girl,genshin impact", "miku", "character")
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print(f"用时: {execution_time:.2f} 秒")
