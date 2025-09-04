@@ -60,8 +60,11 @@ define config.has_voice = True
 
 ## 将以下语句取消注释就可以设置标题界面播放的背景音乐文件。此文件将在整个游戏中
 ## 持续播放，直至音乐停止或其他文件开始播放。
-
-define config.main_menu_music = "gui/custom/bgm.mp3"
+init python:
+    import  random
+    music = ["gui/custom/music1.mp3","gui/custom/music2.mp3","gui/custom/music3.mp3","gui/custom/music4.mp3",]
+    real_music = random.choice(music)
+define config.main_menu_music = real_music
 
 
 ## 转场 ##########################################################################

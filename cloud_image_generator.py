@@ -29,9 +29,14 @@ def online_generate(prompt, mode):
     else:
         width = 512
         height = 768
-        prompt2 = ("masterpiece,wallpaper,(upper_body),face focus,solo,looking at the viewer,((front_view,"
-                   "standing_illustration)),") + prompt
-        model = config['AI绘画'].get('character_id') or "611399039965066695"
+        new_prompt = "masterpiece, absurdres, best quality, high quality, "
+        "chromatic_aberration, cinematic_angle, dutch angle, "
+        "wet, skindentation, chiaroscuro, "
+        "wlop, nixeu, ke-ta"
+        prompt2 = ("(upper_body),face focus,solo,looking at the viewer,((front_view,"
+                   "standing_illustration)),") + new_prompt + prompt
+
+        model = config['AI绘画'].get('character_id') or "611437926598989702"
 
     data = {
         "request_id": str(requests_id),
@@ -86,6 +91,7 @@ def online_generate(prompt, mode):
         return id
     else:
         print(f"请求失败，状态码：{response.status_code}，请检查是否正确填写了key")
+        print(response.text)
         return "error"
 
 
@@ -118,7 +124,7 @@ def online_generate_image(prompt, image_name, mode):
 
 if __name__ == "__main__":
     start_time = time.time()
-    online_generate_image("a girl,genshin impact", "miku", "character")
+    online_generate_image("a girl", "miku", "character")
     end_time = time.time()
     execution_time = end_time - start_time
     print(f"用时: {execution_time:.2f} 秒")

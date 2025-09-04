@@ -74,6 +74,18 @@ def _send_chat_request(messages, json_mode=False):
         data = response.json()
         content = data['choices'][0]['message']['content']
 
+    elif model_supplier == '智谱':
+        url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+        headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
+        payload = {"model": model, "temperature": 0.8, "messages": messages,   "thinking": {"type": "disabled"},}
+        if json_mode:
+            payload["response_format"] = {'type': 'json_object'}
+
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        data = response.json()
+        content = data['choices'][0]['message']['content']
+
     else:
         raise ValueError(f"不支持的供应商: {model_supplier}")
 

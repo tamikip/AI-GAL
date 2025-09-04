@@ -12,7 +12,7 @@ import requests
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer, Qt, QSize
 from PyQt5.QtGui import QIcon, QTextCursor, QPixmap, QIntValidator
 from PyQt5.QtWidgets import QApplication, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget, QSizePolicy, QGridLayout, \
-     QFrame
+    QFrame
 from qfluentwidgets import (NavigationItemPosition, LineEdit, TitleLabel, TogglePushButton, TransparentToolButton,
                             ComboBox, PushButton, FluentIcon, Theme, setTheme, InfoBar, InfoBarPosition, HyperlinkCard,
                             HorizontalFlipView, PrimaryPushButton, StrongBodyLabel, HyperlinkButton, PasswordLineEdit,
@@ -23,6 +23,9 @@ import update
 import subprocess
 import zipfile
 import toml
+from langdetect import detect, DetectorFactory
+
+DetectorFactory.seed = 0
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -196,6 +199,7 @@ class MainWindow(FluentWindow):
     def start_game(self):
         sovits_url = "http://127.0.0.1:9880/"
         comfyui_url = "http://127.0.0.1:8188/"
+        sd_url = "http://127.0.0.1:7860/"
 
         sovits_config = self.config.get('SOVITS', {})
         if sovits_config.get('if_on', True) and not sovits_config.get('if_cloud', False):
@@ -205,7 +209,7 @@ class MainWindow(FluentWindow):
                 return
 
         if not self.config.get('AI绘画', {}).get('if_cloud', False):
-            if not self.check_web_port(comfyui_url):
+            if not self.check_web_port(comfyui_url if self.config.get('AI绘画', {}).get('if_ComfyUI') else sd_url):
                 InfoBar.error('本地绘画服务出错', "请检查是否已开启本地绘画服务", orient=Qt.Vertical,
                               position=InfoBarPosition.BOTTOM_RIGHT, duration=-1, parent=self)
                 return
@@ -555,7 +559,7 @@ class MainWindow(FluentWindow):
         supplier_layout = QHBoxLayout()
         supplier_label = StrongBodyLabel("模型供应商(OpenAI选项可兼容第三方服务商):", page)
         supplier_combo = ComboBox()
-        suppliers = ['OpenAI', 'GoogleAIstudio', 'Ollama']
+        suppliers = ['OpenAI', 'GoogleAIstudio', 'Ollama', '智谱']
         supplier_combo.addItems(suppliers)
         if model_supplier in suppliers:
             supplier_combo.setCurrentIndex(suppliers.index(model_supplier))
@@ -604,6 +608,10 @@ class MainWindow(FluentWindow):
             elif supplier == 'Ollama':
                 input_field1.hide()
                 input_field3.hide()
+                input_field4.hide()
+            elif supplier == '智谱':
+                input_field1.hide()
+                input_field3.show()
                 input_field4.hide()
             self.save_config('CHATGPT', 'ModelSupplier', supplier)
 
@@ -687,6 +695,19 @@ class MainWindow(FluentWindow):
         input_field4.textChanged.connect(lambda text: self.save_config('AI绘画', 'comfyui_address', text))
 
         return page
+
+    def detect_language_lib(self, text):
+        try:
+            lang_code = detect(text)
+            lang_map = {
+                'en': 'en',
+                'zh-cn': 'zh',
+                'zh-tw': 'zh',
+                'ja': 'ja'
+            }
+            return lang_map.get(lang_code, f"其他语言({lang_code})")
+        except:
+            return "zh"
 
     def create_gpt_sovits_page(self, title):
         page = QWidget()
@@ -841,6 +862,8 @@ class MainWindow(FluentWindow):
 
             prompt_input.textChanged.connect(lambda text, index=i: [
                 models[index].update({'url': update_url_param(models[index].get('url'), 'prompt_text', text)}),
+                models[index].update(
+                    {'url': update_url_param(models[index].get('url'), 'prompt_lang', self.detect_language_lib(text))}),
                 save_and_update_config()
             ])
 

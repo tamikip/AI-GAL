@@ -38,6 +38,7 @@ elif Theme_Language == "日文":
     Lang = "ja"
 else:
     Lang = "zh"
+print(Lang)
 
 
 def convert_url(original_url, text_to_speak, language_code):
@@ -88,7 +89,7 @@ def generate_audio(response, name_id, output_name):
     full_url = convert_url(base_url, response, Lang)
     api_response = requests.get(full_url)
     if api_response.status_code == 200:
-        with open(os.path.join(audio_directory, f"{output_name}.wav"), 'wb') as file:
+        with open(os.path.join(audio_directory, f"{output_name}.mp3"), 'wb') as file:
             file.write(api_response.content)
         return "ok"
     else:
@@ -97,7 +98,7 @@ def generate_audio(response, name_id, output_name):
 
 
 if __name__ == "__main__":
-    test_text = "你的笑容，是银河中最璀璨的星轨，让我忍不住想将整个宇宙的浪漫都揉进你的名字，只为让它配得上你的美好。"
+    test_text = "重要（じゅうよう）なのは、私がどう思うかではなく、君がどうしたいかということだ。 "
     start_time = time.time()
     for name_id in range(1, 6):
         output_name = f"test_voice_{name_id}"
