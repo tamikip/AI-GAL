@@ -174,6 +174,8 @@ class MainWindow(FluentWindow):
         for folder in folders_to_delete:
             if os.path.exists(folder):
                 for filename in os.listdir(folder):
+                    if folder.endswith("images") and filename == "UI资源":
+                        continue
                     file_path = os.path.join(folder, filename)
                     if os.path.isfile(file_path) or os.path.islink(file_path):
                         os.unlink(file_path)
