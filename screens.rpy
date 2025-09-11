@@ -227,6 +227,7 @@ screen choice(items):
                 text_hover_yoffset 24
                 text_outlines [(absolute(4), "#4C3D3D", absolute(0), absolute(0))]
                 text_hover_outlines [(absolute(4), "#ffffff", absolute(0), absolute(0))]
+                hover_sound "gui/hover.mp3"
                 action i.action
 
 
@@ -345,6 +346,8 @@ screen navigation():
                 idle '标题_按钮_' + name + '_默认'
                 hover '标题_按钮_' + name + '_焦点'
                 action the_action
+                hover_sound "gui/hover.mp3"
+                activate_sound "gui/hover.mp3"
 
 
         # if main_menu:
@@ -489,6 +492,7 @@ screen game_menu(title, scroll=None, yinitial=0.0, spacing=0, background_image='
         xysize(170,120)
         xycenter(1740,940)
         idle 'images/UI素材/通用/通用_界面_按钮_退出.png'
+        hover_sound "gui/hover.mp3"
         hover Fixed(
             'images/UI素材/通用/通用_界面_按钮说明底图.png',
             'images/UI素材/通用/通用_界面_按钮_退出.png',
@@ -522,6 +526,9 @@ screen game_menu(title, scroll=None, yinitial=0.0, spacing=0, background_image='
                 xysize=(170,120)
             )
             action ShowMenu('save')
+
+style button is default:
+    hover_sound "gui/hover.mp3"
 
 
     # style_prefix "game_menu"
@@ -948,6 +955,7 @@ screen preferences_button(title='', p1=['', NullAction()], p2=['', NullAction()]
                     color '#ffffff'
                     xycenter(0.5,0.3)
                 hovered SetVariable('the_hover_button', title+'_'+p1[0])
+                hover_sound "gui/hover.mp3"
                 unhovered SetVariable('the_hover_button', '')
                 action p1[1]
             
@@ -967,6 +975,7 @@ screen preferences_button(title='', p1=['', NullAction()], p2=['', NullAction()]
                     color '#ffffff'
                     xycenter(0.5,0.3)
                 hovered SetVariable('the_hover_button', title+'_'+p2[0])
+                hover_sound "gui/hover.mp3"
                 unhovered SetVariable('the_hover_button', '')
                 action p2[1]
 
