@@ -351,7 +351,7 @@ class MainWindow(FluentWindow):
             thumbnail_label.setAlignment(Qt.AlignCenter)
 
         info_label = StrongBodyLabel(snapshot_base_name)
-        info_label.setStyleSheet("font-size: 20px; color: #333;")
+        info_label.setStyleSheet("font-size: 50px;")
         card_layout.addWidget(info_label, 1)
         restore_button = PushButton("还原快照")
         restore_button.setFixedSize(150, 50)
