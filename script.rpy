@@ -149,14 +149,8 @@ label start:
         $ t = threading.Thread(target=generator.main, daemon=True)
         show sea
         $ t.start()
-        "大纲生成中..."
+        "故事生成中..."
         while generator.already_state != "complete":
-            if generator.already_state == "story":
-                "故事生成中..."
-            elif generator.already_state == "picture":
-                "图片生成中..."
-            elif generator.already_state == "audio":
-                "语音生成中..."
             $ renpy.pause(1, hard=True)
         scene black
         stop music
@@ -199,9 +193,10 @@ label start:
 
         $ character_name = dialogue["character"]
         $ text = dialogue["text"]
-        $ background_image = f"images/{dialogue['background_image']}.png" if dialogue['background_image'] and os.path.exists(os.path.join(game_directory, "images", f"{dialogue['background_image']}.png")) else ""
+        $ background_image = os.path.join("images", f"{dialogue['background_image']}.png").replace("\\", "/")
+        $ character_image = os.path.join("images", f"{dialogue['character']}.png").replace("\\", "/") if dialogue['character'] and os.path.exists(os.path.join(game_directory, "images", f"{dialogue['character']}.png")) else ""
         $ audio = f"{dialogue['audio']}"
-        $ character_image = f"images/{dialogue['character']}.png" if dialogue['character'] and os.path.exists(os.path.join(game_directory, "images", f"{dialogue['character']}.png")) else ""
+
 
         if character_name not in characters:
             $ characters[character_name] = Character(character_name)

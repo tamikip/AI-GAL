@@ -332,7 +332,7 @@ class GameGenerator:
 
         # todo:多线程
         characters_lines = [line.strip() for line in characters.splitlines() if ":" in line.strip()]
-        with ThreadPoolExecutor(max_workers=6) as executor:
+        with ThreadPoolExecutor(max_workers=4) as executor:
             futures = []
             for char_line in characters_lines:
                 future = executor.submit(self._generate_character_assets, char_line)
