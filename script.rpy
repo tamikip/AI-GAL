@@ -101,20 +101,29 @@ label splashscreen:
 label talk_mode:
     show eileen movie
     python:
-        extracted_lines = read(os.path.join(game_directory, "characters.txt"))
-        extracted_lines = extracted_lines.strip().split('\n')
-        choice1, choice2, choice3, choice4 = extracted_lines[1:5]
-        choice_list = list_change(choice1, choice2, choice3, choice4, mode="talk")
-        character_choice = renpy.display_menu(choice_list, interact=True, screen='choice')
-        character_choices = {
-            "choice1": choice1,
-            "choice2": choice2,
-            "choice3": choice3,
-            "choice4": choice4
-        }
-        character = character_choices.get(character_choice)
-        id = int(''.join(filter(str.isdigit, character_choice))) + 1
-        history = []
+        try:
+            extracted_lines = read(os.path.join(game_directory, "characters.txt"))
+            extracted_lines = extracted_lines.strip().split('\n')
+            choice1, choice2, choice3, choice4 = extracted_lines[1:5]
+            choice_list = list_change(choice1, choice2, choice3, choice4, mode="talk")
+            character_choice = renpy.display_menu(choice_list, interact=True, screen='choice')
+            character_choices = {
+                "choice1": choice1,
+                "choice2": choice2,
+                "choice3": choice3,
+                "choice4": choice4
+            }
+            character = character_choices.get(character_choice)
+            id = int(''.join(filter(str.isdigit, character_choice))) + 1
+            history = []
+        except Exception as e:
+            renpy.call_screen("confirm",
+                message="读取角色信息出错，即将返回主菜单",
+                yes_action=Return(True),
+                no_action=Return(False))
+
+            # 无论点什么，都回主菜单
+            renpy.full_restart()
     while True:
         scene bedroom
         stop music
