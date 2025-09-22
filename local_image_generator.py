@@ -1,4 +1,3 @@
-
 import requests
 import os
 import json
@@ -94,11 +93,11 @@ def ComfyUI_generate_image(prompt, image_name, mode):
     with open(workflow_path, "r", encoding="utf-8") as file:
         prompt_data = json.load(file)
     if mode == 'background':
-        prompt_data["5"]["inputs"]["seed"] = random.randint(1, 1000000)
-        prompt_data["5"]["inputs"]["prompt"] += prompt
+        prompt_data["3"]["inputs"]["seed"] = random.randint(1, 1000000)
+        prompt_data["6"]["inputs"]["text"] += prompt
     if mode == 'character':
         prompt_data["3"]["inputs"]["seed"] = random.randint(1, 1000000)
-        prompt_data["3"]["inputs"]["prompt"] += prompt
+        prompt_data["6"]["inputs"]["text"] += prompt
     result = queue_prompt(prompt_data, ComfyUI_url)
     prompt_id = result.get("prompt_id")
     if not prompt_id:
@@ -108,10 +107,9 @@ def ComfyUI_generate_image(prompt, image_name, mode):
     while True:
         history = get_history(prompt_id, ComfyUI_url)
         if history and prompt_id in history:
-            print("图片下载完成！")
 
             outputs = history[prompt_id].get('outputs', {})
-            output_node = '7' if mode == 'background' else '10'
+            output_node = '9' if mode == 'background' else '9'
             if outputs and output_node in outputs:
                 images = outputs[output_node].get('images', [])
                 for idx, image in enumerate(images):
@@ -185,3 +183,6 @@ def generate_image(prompt, image_name, mode):
         ComfyUI_generate_image(prompt, image_name, mode)
     else:
         StableDiffusion_generate_image(prompt, image_name, mode)
+
+
+ComfyUI_generate_image("miku", "forest", "background")
